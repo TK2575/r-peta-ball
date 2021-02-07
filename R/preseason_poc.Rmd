@@ -1,0 +1,98 @@
+---
+title: "Pre-season POC"
+author: "Tom & Will"
+date: "2/6/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(baseballr)
+library(janitor)
+library(here)
+source(here::here("R", "scrape_bref.R"))
+```
+
+Step 1 - Get Data
+```{r}
+games_2021 <- 162
+
+standings_2020 <- 
+  standings_expanded(2020) %>% 
+  filter(tm != 'Avg') %>% 
+  mutate(tm = tm %>% stringr::str_sub(start=-3)) %>% 
+  janitor::clean_names() %>% 
+  select(year, tm, g:w_l_percent, r, ra) %>% 
+  mutate(r = as.numeric(r),
+         ra = as.numeric(ra)) %>% 
+  rename(r_g = r,
+         ra_g = ra)
+
+team_batting_2020 <- 
+  team_batting(2020) %>% 
+  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  janitor::clean_names() %>% 
+  select(year, tm, h, ba, obp, slg) %>% 
+  mutate(h = as.numeric(h), 
+         ba = as.numeric(ba),
+         obp = as.numeric(obp),
+         slg = as.numeric(slg),
+         iso = slg - ba)
+
+team_batting_against_2020 <- 
+  team_batting_against(2020) %>% 
+  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  janitor::clean_names() %>% 
+  select(year, tm, h, ba, obp, slg) %>% 
+  mutate(h = as.numeric(h),
+         ba = as.numeric(ba),
+         obp = as.numeric(obp),
+         slg = as.numeric(slg),
+         iso_a = slg - ba) %>% 
+  rename(ha = h,
+         ba_a = ba,
+         obp_a = obp,
+         slg_a = slg)
+  
+team_stats_2020 <- 
+  standings_2020 %>% 
+  full_join(team_batting_against_2020, by = c("year", "tm")) %>%
+  full_join(team_batting_2020, by = c("year", "tm"))
+
+step1 <-
+  team_stats_2020 %>% 
+    mutate(r = (r_g * games_2021) %>% round(),
+           ra = (ra_g * games_2021) %>% round()) %>% 
+    select(tm, r, ra) 
+```
+
+Calculate each team's cluster luck adjustments
+```{r}
+team_stats_2020 <- 
+  team_stats_2020 %>% 
+  mutate(r = (r_g * g) %>% round(),
+         ra = (ra_g * g) %>% round(),
+         hits_per_run = (h / r) %>% round(3))
+
+mean_hits_per_run <- 
+  mean(team_stats_2020$hits_per_run) %>% 
+  round(3)
+
+team_stats_2020 <- 
+  team_stats_2020 %>% 
+  mutate(runs_exp = (h / mean_hits_per_run) %>% round(),
+         runs_a_exp = (ha / mean_hits_per_run) %>% round())
+
+step2 <-
+  team_stats_2020 %>% 
+  mutate(r = (r * (games_2021 / g)) %>% round(),
+         ra = (ra * (games_2021 / g)) %>% round(),
+         runs_exp = (runs_exp * (games_2021 / g)) %>% round(),
+         runs_a_exp = (runs_a_exp * (games_2021 / g)) %>% round()) %>%
+    mutate(r = runs_exp - r,
+           ra = runs_a_exp - ra) %>% 
+  select(tm, r, ra) 
+```
