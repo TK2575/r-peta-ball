@@ -20,6 +20,11 @@ Step 1 - Get Data
 ```{r}
 games_2021 <- 162
 
+team_abbreviation_map <-
+  here::here("data", "team_abbrevation_map.csv") %>% 
+  readr::read_csv() %>% 
+  janitor::clean_names()
+
 standings_2020 <- 
   standings_expanded(2020) %>% 
   filter(tm != 'Avg') %>% 
@@ -88,11 +93,77 @@ team_stats_2020 <-
 
 step2 <-
   team_stats_2020 %>% 
-  mutate(r = (r * (games_2021 / g)) %>% round(),
-         ra = (ra * (games_2021 / g)) %>% round(),
+  mutate(r_adj = (r * (games_2021 / g)) %>% round(),
+         ra_adj = (ra * (games_2021 / g)) %>% round(),
          runs_exp = (runs_exp * (games_2021 / g)) %>% round(),
          runs_a_exp = (runs_a_exp * (games_2021 / g)) %>% round()) %>%
-    mutate(r = runs_exp - r,
-           ra = runs_a_exp - ra) %>% 
+    mutate(r = runs_exp - r_adj,
+           ra = runs_a_exp - ra_adj) %>% 
   select(tm, r, ra) 
+```
+
+Calculate team offense WAR adjustments
+```{r}
+
+batting_results_2020 <-
+  here::here("data", "2020_batting_results.csv") %>% 
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, war)
+
+batting_projections_2021 <-
+  here::here("data", "2021_batting_projections.csv") %>%
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  dplyr::filter(!is.na(team)) %>% 
+  group_by(team) %>% 
+  summarize(war_proj = sum(war)) %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, war_proj)
+
+step3a <- 
+  team_stats_2020 %>% 
+  left_join(batting_projections_2021) %>% 
+  left_join(batting_results_2020) %>% 
+  mutate(war_adj = (war * games_2021 / g) %>% round(2),
+         war_diff = war_proj - war_adj,
+         r = war_diff * 10) %>% 
+  select(tm, r)
+
+```
+
+Calculate Team Pitching WAR Adjustments
+```{r}
+
+pitching_results_2020 <-
+  here::here("data", "2020_pitching_results.csv") %>% 
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, war)
+
+pitching_projections_2021 <-
+  here::here("data", "2021_pitching_projections.csv") %>%
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  dplyr::filter(!is.na(team)) %>% 
+  group_by(team) %>% 
+  summarize(war_proj = sum(war)) %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, war_proj)
+
+step3b <-
+  team_stats_2020 %>% 
+  left_join(pitching_projections_2021) %>% 
+  left_join(pitching_results_2020) %>% 
+  mutate(war_adj = (war * games_2021 / g) %>% round(2),
+         war_diff = war_adj - war_proj,
+         ra = war_diff * 10) %>% 
+  select(tm, ra) 
+
+step3 <- 
+  step3a %>% 
+  full_join(step3b)
+
 ```
