@@ -167,3 +167,24 @@ step3 <-
   full_join(step3b)
 
 ```
+
+Sum up adjustments
+```{r}
+
+apply_adjustments <- function(df1, df2) {
+  df1 %>% 
+    full_join(df2, by = "tm") %>% 
+    mutate(r = r.x + r.y,
+           ra = ra.x + ra.y) %>% 
+    select(tm, r, ra)
+}
+
+team_projections_2021 <-
+  step1 %>% 
+  apply_adjustments(step2) %>% 
+  apply_adjustments(step3)
+
+team_projections_2021 %>% 
+  summarize(r = sum(r),
+            ra = sum(ra))
+```
