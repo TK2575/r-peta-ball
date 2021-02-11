@@ -67,20 +67,39 @@ team_stats_2020 <-
   full_join(team_batting_against_2020, by = c("year", "tm")) %>%
   full_join(team_batting_2020, by = c("year", "tm"))
 
+runs_scored_adjustments <- 
+  team_stats_2020 %>% 
+  mutate(r_162 = r_g * games_2021,
+         ra_162 = ra_g * games_2021,
+         r_60 = r_g * g,
+         ra_60 = ra_g * g) %>% 
+  select(tm, g, r_g, ra_g, r_162:ra_60) %>% 
+  summarize(teams = n(),
+            across(r_g:ra_60, sum)) %>% 
+  mutate(r_g_diff = (ra_g - r_g) / teams ,
+         r_162_diff = (ra_162 - r_162) / teams,
+         r_60_diff = (ra_60 - r_60) / teams) %>% 
+  select(r_g_diff:r_60_diff)
+
+team_stats_2020 <- 
+  team_stats_2020 %>% 
+  mutate(r_2020 = r_g * g + runs_scored_adjustments$r_60_diff,
+         ra_2020 = ra_g * g,
+         r_2021 = r_g * games_2021 + runs_scored_adjustments$r_162_diff,
+         ra_2021 = ra_g * games_2021)
+
 step1 <-
   team_stats_2020 %>% 
-    mutate(r = (r_g * games_2021) %>% round(),
-           ra = (ra_g * games_2021) %>% round()) %>% 
-    select(tm, r, ra) 
+  select(tm, r_2021, ra_2021) %>% 
+  rename(r = r_2021,
+         ra = ra_2021)
 ```
 
 Calculate each team's cluster luck adjustments
 ```{r}
 team_stats_2020 <- 
   team_stats_2020 %>% 
-  mutate(r = (r_g * g) %>% round(),
-         ra = (ra_g * g) %>% round(),
-         hits_per_run = (h / r) %>% round(3))
+  mutate(hits_per_run = (h / r_2021))
 
 mean_hits_per_run <- 
   mean(team_stats_2020$hits_per_run) %>% 
@@ -91,14 +110,13 @@ team_stats_2020 <-
   mutate(runs_exp = (h / mean_hits_per_run) %>% round(),
          runs_a_exp = (ha / mean_hits_per_run) %>% round())
 
+# Runs appear to be too high
 step2 <-
   team_stats_2020 %>% 
-  mutate(r_adj = (r * (games_2021 / g)) %>% round(),
-         ra_adj = (ra * (games_2021 / g)) %>% round(),
-         runs_exp = (runs_exp * (games_2021 / g)) %>% round(),
+  mutate(runs_exp = (runs_exp * (games_2021 / g)) %>% round(),
          runs_a_exp = (runs_a_exp * (games_2021 / g)) %>% round()) %>%
-    mutate(r = runs_exp - r_adj,
-           ra = runs_a_exp - ra_adj) %>% 
+    mutate(r = runs_exp - r_2021,
+           ra = runs_a_exp - ra_2021) %>% 
   select(tm, r, ra) 
 ```
 
