@@ -88,6 +88,9 @@ team_stats_2020 <-
          r_2021 = r_g * games_2021 + runs_scored_adjustments$r_162_diff,
          ra_2021 = ra_g * games_2021)
 
+team_stats_2020 %>% 
+  summarize(across(r_2020:ra_2021, sum))
+
 step1 <-
   team_stats_2020 %>% 
   select(tm, r_2021, ra_2021) %>% 
@@ -99,7 +102,7 @@ Calculate each team's cluster luck adjustments
 ```{r}
 team_stats_2020 <- 
   team_stats_2020 %>% 
-  mutate(hits_per_run = (h / r_2021))
+  mutate(hits_per_run = (h / r_2020))
 
 mean_hits_per_run <- 
   mean(team_stats_2020$hits_per_run) %>% 
@@ -110,7 +113,6 @@ team_stats_2020 <-
   mutate(runs_exp = (h / mean_hits_per_run) %>% round(),
          runs_a_exp = (ha / mean_hits_per_run) %>% round())
 
-# Runs appear to be too high
 step2 <-
   team_stats_2020 %>% 
   mutate(runs_exp = (runs_exp * (games_2021 / g)) %>% round(),
@@ -202,7 +204,59 @@ team_projections_2021 <-
   apply_adjustments(step2) %>% 
   apply_adjustments(step3)
 
-team_projections_2021 %>% 
+```
+
+Normalize all RS/RA to last year's environment of total runs
+```{r}
+# add the correct number of runs/allowed to each team so that the total projected for 2021 equals the 2020 162 game page
+
+runs_projected_2021 <- 
+  team_projections_2021 %>% 
   summarize(r = sum(r),
-            ra = sum(ra))
+            ra = sum(ra)) %>% 
+  mutate(year = '2021')
+
+runs_pace_2020 <-
+  team_stats_2020 %>% 
+  select(tm, g, r_2020:ra_2021) %>% 
+  mutate(r_2020_162 = r_2020 * games_2021 / g,
+         ra_2020_162 = ra_2020 * games_2021 / g) %>% 
+  summarize(across(r_2020_162:ra_2020_162, sum)) %>% 
+  rename(r = r_2020_162,
+         ra = ra_2020_162) %>% 
+  mutate(year = '2020')
+
+team_count <-
+  team_stats_2020 %>% 
+  summarize(n = n()) %>% 
+  pull()
+  
+runs_projected_adjustments <-
+  tibble(r = (runs_pace_2020$r - runs_projected_2021$r) / team_count,
+         ra = (runs_pace_2020$ra - runs_projected_2021$ra) / team_count)
+
+team_projections_2021 <-
+  team_projections_2021 %>% 
+  rename(r_raw = r,
+         ra_raw = ra) %>% 
+  mutate(r = r_raw + runs_projected_adjustments$r,
+         ra = ra_raw + runs_projected_adjustments$ra)
+```
+
+Calculate expected wins via Pythagorean theorem
+```{r}
+ex <- 1.83
+
+team_projections_2021 <- 
+  team_projections_2021 %>% 
+  mutate(r_diff = r - ra,
+         r_g = r / games_2021,
+         ra_g = r / games_2021,
+         wp = r^ex / (r^ex + ra^ex)) %>% 
+  select(tm, wp, r_diff, r_g, ra_g)
+
+team_projections_2021 %>% 
+  arrange(wp %>% desc()) %>% 
+  mutate_if(is.numeric, ~round(., 3)) %>% 
+  write_csv(here::here("out", "team_projections_2021.csv"))
 ```
