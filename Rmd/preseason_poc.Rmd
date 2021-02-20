@@ -96,6 +96,9 @@ step1 <-
   select(tm, r_2021, ra_2021) %>% 
   rename(r = r_2021,
          ra = ra_2021)
+
+step1 %>% 
+  write_csv(here::here("out", "step1.csv"))
 ```
 
 Calculate each team's cluster luck adjustments
@@ -120,6 +123,9 @@ step2 <-
     mutate(r = runs_exp - r_2021,
            ra = runs_a_exp - ra_2021) %>% 
   select(tm, r, ra) 
+
+step2 %>% 
+  write_csv(here::here("out", "step2.csv"))
 ```
 
 Calculate team offense WAR adjustments
@@ -186,6 +192,9 @@ step3 <-
   step3a %>% 
   full_join(step3b)
 
+step3 %>% 
+  write_csv(here::here("out", "step3.csv"))
+
 ```
 
 Sum up adjustments
@@ -203,6 +212,9 @@ team_projections_2021 <-
   step1 %>% 
   apply_adjustments(step2) %>% 
   apply_adjustments(step3)
+
+team_projections_2021 %>% 
+  write_csv(here::here("out", "team_projections_2021_raw.csv"))
 
 ```
 
@@ -251,7 +263,7 @@ team_projections_2021 <-
   team_projections_2021 %>% 
   mutate(r_diff = r - ra,
          r_g = r / games_2021,
-         ra_g = r / games_2021,
+         ra_g = ra / games_2021,
          wp = r^ex / (r^ex + ra^ex)) %>% 
   select(tm, wp, r_diff, r_g, ra_g)
 
