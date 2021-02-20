@@ -214,7 +214,7 @@ team_projections_2021 <-
   apply_adjustments(step3)
 
 team_projections_2021 %>% 
-  write_csv(here::here("out", "team_projections_2021_raw.csv"))
+  write_csv(here::here("out", "step4.csv"))
 
 ```
 
@@ -270,5 +270,5 @@ team_projections_2021 <-
 team_projections_2021 %>% 
   arrange(wp %>% desc()) %>% 
   mutate_if(is.numeric, ~round(., 3)) %>% 
-  write_csv(here::here("out", "team_projections_2021.csv"))
+  write_csv(here::here("out", "step5.csv"))
 ```
