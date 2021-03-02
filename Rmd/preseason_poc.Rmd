@@ -145,7 +145,7 @@ batting_projections_2021 <-
   dplyr::filter(!is.na(team)) %>% 
   group_by(team) %>% 
   summarize(war_proj = sum(war)) %>% 
-  left_join(team_abbreviation_map) %>% 
+  rename(tm=team) %>% 
   select(tm, war_proj)
 
 step3a <- 
@@ -154,7 +154,7 @@ step3a <-
   left_join(batting_results_2020) %>% 
   mutate(war_adj = (war * games_2021 / g) %>% round(2),
          war_diff = war_proj - war_adj,
-         r = war_diff * 10) %>% 
+         r = (war_diff * 10) %>% round(2)) %>% 
   select(tm, r)
 
 ```
@@ -176,7 +176,7 @@ pitching_projections_2021 <-
   dplyr::filter(!is.na(team)) %>% 
   group_by(team) %>% 
   summarize(war_proj = sum(war)) %>% 
-  left_join(team_abbreviation_map) %>% 
+  rename(tm=team) %>% 
   select(tm, war_proj)
 
 step3b <-
@@ -185,7 +185,7 @@ step3b <-
   left_join(pitching_results_2020) %>% 
   mutate(war_adj = (war * games_2021 / g) %>% round(2),
          war_diff = war_adj - war_proj,
-         ra = war_diff * 10) %>% 
+         ra = (war_diff * 10) %>% round(2)) %>% 
   select(tm, ra) 
 
 step3 <- 
