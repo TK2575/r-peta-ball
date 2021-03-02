@@ -17,7 +17,7 @@ source(here::here("R", "scrape_bref.R"))
 ```
 
 Step 1 - Get Data
-```{r}
+```{r Step 1}
 games_2021 <- 162
 
 team_abbreviation_map <-
@@ -101,8 +101,8 @@ step1 %>%
   write_csv(here::here("out", "step1.csv"))
 ```
 
-Calculate each team's cluster luck adjustments
-```{r}
+Step 2: Calculate each team's cluster luck adjustments
+```{r Step 2}
 team_stats_2020 <- 
   team_stats_2020 %>% 
   mutate(hits_per_run = (h / r_2020))
@@ -128,8 +128,8 @@ step2 %>%
   write_csv(here::here("out", "step2.csv"))
 ```
 
-Calculate team offense WAR adjustments
-```{r}
+Step 3a: Calculate team offense WAR adjustments
+```{r Step 3a}
 
 batting_results_2020 <-
   here::here("data", "2020_batting_results.csv") %>% 
@@ -159,8 +159,8 @@ step3a <-
 
 ```
 
-Calculate Team Pitching WAR Adjustments
-```{r}
+Step 3b and 3: Calculate Team Pitching WAR Adjustments
+```{r Step 3b and 3}
 
 pitching_results_2020 <-
   here::here("data", "2020_pitching_results.csv") %>% 
@@ -197,8 +197,8 @@ step3 %>%
 
 ```
 
-Sum up adjustments
-```{r}
+Step 4: Sum up adjustments
+```{r Step 4}
 
 apply_adjustments <- function(df1, df2) {
   df1 %>% 
@@ -218,8 +218,8 @@ team_projections_2021 %>%
 
 ```
 
-Normalize all RS/RA to last year's environment of total runs
-```{r}
+Step 5: Normalize all RS/RA to last year's environment of total runs
+```{r Step 5}
 # add the correct number of runs/allowed to each team so that the total projected for 2021 equals the 2020 162 game page
 
 runs_projected_2021 <- 
@@ -255,8 +255,8 @@ team_projections_2021 <-
          ra = ra_raw + runs_projected_adjustments$ra)
 ```
 
-Calculate expected wins via Pythagorean theorem
-```{r}
+Step 6: Calculate expected wins via Pythagorean theorem
+```{r Step 6}
 ex <- 1.83
 
 team_projections_2021 <- 
