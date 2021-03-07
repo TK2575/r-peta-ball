@@ -22,7 +22,7 @@ games_2021 <- 162
 ex <- 1.83
 
 team_abbreviation_map <-
-  here::here("data", "team_abbrevation_map.csv") %>% 
+  here::here("in", "team_abbrevation_map.csv") %>% 
   readr::read_csv() %>% 
   janitor::clean_names()
 
@@ -133,14 +133,14 @@ Step 3a: Calculate team offense WAR adjustments
 ```{r Step 3a}
 
 batting_results_2020 <-
-  here::here("data", "2020_batting_results.csv") %>% 
+  here::here("in", "2020_batting_results.csv") %>% 
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
   select(tm, war)
 
 batting_projections_2021 <-
-  here::here("data", "2021_batting_projections.csv") %>%
+  here::here("in", "2021_batting_projections.csv") %>%
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   dplyr::filter(!is.na(team)) %>% 
@@ -177,14 +177,14 @@ Step 3b and 3: Calculate Team Pitching WAR Adjustments
 ```{r Step 3b and 3}
 
 pitching_results_2020 <-
-  here::here("data", "2020_pitching_results.csv") %>% 
+  here::here("in", "2020_pitching_results.csv") %>% 
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
   select(tm, war)
 
 pitching_projections_2021 <-
-  here::here("data", "2021_pitching_projections.csv") %>%
+  here::here("in", "2021_pitching_projections.csv") %>%
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   dplyr::filter(!is.na(team)) %>% 
