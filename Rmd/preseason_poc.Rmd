@@ -16,10 +16,17 @@ library(here)
 source(here::here("R", "scrape_bref.R"))
 ```
 
-Step 1 - Get Data
-```{r Step 1}
+```{r Load Inputs}
 games_2021 <- 162
 ex <- 1.83
+
+apply_adjustments <- function(df1, df2) {
+  df1 %>% 
+    full_join(df2, by = "tm") %>% 
+    mutate(r = r.x + r.y,
+           ra = ra.x + ra.y) %>% 
+    select(tm, r, ra)
+}
 
 team_abbreviation_map <-
   here::here("in", "team_abbrevation_map.csv") %>% 
@@ -62,7 +69,44 @@ team_batting_against_2020 <-
          ba_a = ba,
          obp_a = obp,
          slg_a = slg)
+
+batting_results_2020 <-
+  here::here("in", "2020_batting_results.csv") %>% 
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, war)
+
+batting_projections_2021 <-
+  here::here("in", "2021_batting_projections.csv") %>%
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  dplyr::filter(!is.na(team)) %>% 
+  group_by(team) %>% 
+  summarize(war_proj = sum(war)) %>% 
+  rename(tm=team) %>% 
+  select(tm, war_proj)
+
+pitching_results_2020 <-
+  here::here("in", "2020_pitching_results.csv") %>% 
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, war)
+
+pitching_projections_2021 <-
+  here::here("in", "2021_pitching_projections.csv") %>%
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  dplyr::filter(!is.na(team)) %>% 
+  group_by(team) %>% 
+  summarize(war_proj = sum(war)) %>% 
+  rename(tm=team) %>% 
+  select(tm, war_proj)
+```
   
+Step 1 - Get Data
+```{r Step 1} 
 team_stats_2020 <- 
   standings_2020 %>% 
   full_join(team_batting_against_2020, by = c("year", "tm")) %>%
@@ -89,9 +133,6 @@ team_stats_2020 <-
          r_2021 = r_g * games_2021 + runs_scored_adjustments$r_162_diff,
          ra_2021 = ra_g * games_2021)
 
-team_stats_2020 %>% 
-  summarize(across(r_2020:ra_2021, sum))
-
 step1 <-
   team_stats_2020 %>% 
   select(tm, r_2021, ra_2021) %>% 
@@ -100,6 +141,8 @@ step1 <-
 
 step1 %>% 
   write_csv(here::here("out", "step1.csv"))
+
+running_adjustments <- step1
 ```
 
 Step 2: Calculate each team's cluster luck adjustments
@@ -127,103 +170,38 @@ step2 <-
 
 step2 %>% 
   write_csv(here::here("out", "step2.csv"))
+
+running_adjustments <- 
+  apply_adjustments(running_adjustments, step2)
+
 ```
 
-Step 3a: Calculate team offense WAR adjustments
-```{r Step 3a}
+Step 3: Calculate team offense and pitching WAR adjustments
+```{r Step 3}
 
-batting_results_2020 <-
-  here::here("in", "2020_batting_results.csv") %>% 
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  left_join(team_abbreviation_map) %>% 
-  select(tm, war)
-
-batting_projections_2021 <-
-  here::here("in", "2021_batting_projections.csv") %>%
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  dplyr::filter(!is.na(team)) %>% 
-  group_by(team) %>% 
-  summarize(war_proj = sum(war)) %>% 
-  rename(tm=team) %>% 
-  select(tm, war_proj)
-
-step3a <- 
-  team_stats_2020 %>% 
+step3 <-
+  running_adjustments %>% 
+  rename(r_running_adj = r,
+         ra_running_adj = ra) %>% 
+  left_join(team_stats_2020) %>% 
   left_join(batting_projections_2021) %>% 
   left_join(batting_results_2020) %>% 
-  # OLD WAR TO RUNS CALC METHOD
-  # mutate(war_adj = (war * games_2021 / g) %>% round(2),
-  #        war_diff = war_proj - war_adj,
-  #        r = (war_diff * 10) %>% round(2)) %>% 
-  mutate(war_adj = (war * games_2021 / g) %>% round(2), #adjusts to 162 games
+  mutate(war_adj = (war * games_2021 / g) %>% round(2),
          war_diff = war_proj - war_adj,
-         wp_diff = war_diff / games_2021, #using 162 games like war_adj
-         r = pull(step1,r)+pull(step2,r),
-         ra = pull(step1,ra)+pull(step2,ra),
-         step2_r_cum = r,
-         step2_ra_cum = ra,
-         Pyth_old = r^ex / (r^ex + ra^ex),
-         r_exponent = ra^ex * (wp_diff + Pyth_old) / (1 - (wp_diff + Pyth_old)),
-         step3a_r = r_exponent^(1/ex) - step2_r_cum,
-         r = step3a_r %>% round(2)) %>%
-  # select(tm, step3a_r, war_diff, wp_diff, step2_r_cum, step2_ra_cum) used for checking
-  select(tm, r)
-
-```
-
-Step 3b and 3: Calculate Team Pitching WAR Adjustments
-```{r Step 3b and 3}
-
-pitching_results_2020 <-
-  here::here("in", "2020_pitching_results.csv") %>% 
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  left_join(team_abbreviation_map) %>% 
-  select(tm, war)
-
-pitching_projections_2021 <-
-  here::here("in", "2021_pitching_projections.csv") %>%
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  dplyr::filter(!is.na(team)) %>% 
-  group_by(team) %>% 
-  summarize(war_proj = sum(war)) %>% 
-  rename(tm=team) %>% 
-  select(tm, war_proj)
-
-step3b <-
-  team_stats_2020 %>% 
-  left_join(pitching_projections_2021) %>% 
-  left_join(pitching_results_2020) %>% 
-  # OLD WAR TO RUNS ALLOWED CALC METHOD
-  # mutate(war_adj = (war * games_2021 / g) %>% round(2),
-  #        war_diff = war_adj - war_proj,
-  #        ra = (war_diff * 10) %>% round(2)) %>% 
-  # select(tm, ra) 
-
-mutate(war_adj = (war * games_2021 / g) %>% round(2), #adjusts to 162 games
-        war_diff = war_proj - war_adj,
-        wp_diff = war_diff / games_2021, #using 162 games like war_adj
-        r = pull(step1,r)+pull(step2,r),
-        ra = pull(step1,ra)+pull(step2,ra),
-        step2_r_cum = r,
-        step2_ra_cum = ra,
-        Pyth_old = r^ex / (r^ex + ra^ex),
-        ra_exponent = r^ex * (1 - wp_diff - Pyth_old) / (wp_diff + Pyth_old),
-        step3b_ra = ra_exponent^(1/ex) - step2_ra_cum,
-        ra = step3b_ra %>% round(2)) %>%
-  # select(tm, step3b_ra, war_diff, wp_diff, step2_r_cum, step2_ra_cum) used for checking
-  select(tm, ra)
+         wp_diff = war_diff / games_2021,
+         pyth_old = r_running_adj^ex / (r_running_adj^ex + ra_running_adj^ex),
+         r_exponent = ra_running_adj^ex * (wp_diff + pyth_old) / (1 - (wp_diff + pyth_old)),
+         ra_exponent = r_running_adj^ex * (1 - wp_diff - pyth_old) / (wp_diff + pyth_old),
+         r = (r_exponent^(1/ex) - r_running_adj) %>% round(2),
+         ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2)) %>% 
+  select(tm, r_running_adj, ra_running_adj, war, g, war_proj, war_adj, war_diff, wp_diff, pyth_old, r_exponent, r, ra_exponent, ra) %>% 
+  select(tm, r, ra)
   
-step3 <- 
-  step3a %>%
-  full_join(step3b)
-  select()
-
 step3 %>% 
   write_csv(here::here("out", "step3.csv"))
+
+running_adjustments <- 
+  apply_adjustments(running_adjustments, step3)
 
 ```
 
