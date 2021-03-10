@@ -142,7 +142,7 @@ step1 <-
 step1 %>% 
   write_csv(here::here("out", "step1.csv"))
 
-running_adjustments <- step1
+team_projections_2021 <- step1
 ```
 
 Step 2: Calculate each team's cluster luck adjustments
@@ -171,16 +171,16 @@ step2 <-
 step2 %>% 
   write_csv(here::here("out", "step2.csv"))
 
-running_adjustments <- 
-  apply_adjustments(running_adjustments, step2)
+team_projections_2021 <- 
+  apply_adjustments(team_projections_2021, step2)
 
 ```
 
 Step 3: Calculate team offense and pitching WAR adjustments
 ```{r Step 3}
 
-step3 <-
-  running_adjustments %>% 
+step3a <-
+  team_projections_2021 %>% 
   rename(r_running_adj = r,
          ra_running_adj = ra) %>% 
   left_join(team_stats_2020) %>% 
@@ -194,32 +194,39 @@ step3 <-
          ra_exponent = r_running_adj^ex * (1 - wp_diff - pyth_old) / (wp_diff + pyth_old),
          r = (r_exponent^(1/ex) - r_running_adj) %>% round(2),
          ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2)) %>% 
-  select(tm, r_running_adj, ra_running_adj, war, g, war_proj, war_adj, war_diff, wp_diff, pyth_old, r_exponent, r, ra_exponent, ra) %>% 
-  select(tm, r, ra)
+  select(tm, r)
+
+step3b <-
+  team_projections_2021 %>% 
+  rename(r_running_adj = r,
+         ra_running_adj = ra) %>% 
+  left_join(team_stats_2020) %>% 
+  left_join(pitching_projections_2021) %>% 
+  left_join(pitching_results_2020) %>% 
+  mutate(war_adj = (war * games_2021 / g) %>% round(2),
+         war_diff = war_proj - war_adj,
+         wp_diff = war_diff / games_2021,
+         pyth_old = r_running_adj^ex / (r_running_adj^ex + ra_running_adj^ex),
+         r_exponent = ra_running_adj^ex * (wp_diff + pyth_old) / (1 - (wp_diff + pyth_old)),
+         ra_exponent = r_running_adj^ex * (1 - wp_diff - pyth_old) / (wp_diff + pyth_old),
+         r = (r_exponent^(1/ex) - r_running_adj) %>% round(2),
+         ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2)) %>% 
+  select(tm, ra)
   
+step3 <- 
+  step3a %>%
+  full_join(step3b)
+    
 step3 %>% 
   write_csv(here::here("out", "step3.csv"))
 
-running_adjustments <- 
-  apply_adjustments(running_adjustments, step3)
+team_projections_2021 <- 
+  apply_adjustments(team_projections_2021, step3)
 
 ```
 
 Step 4: Sum up adjustments
 ```{r Step 4}
-
-apply_adjustments <- function(df1, df2) {
-  df1 %>% 
-    full_join(df2, by = "tm") %>% 
-    mutate(r = r.x + r.y,
-           ra = ra.x + ra.y) %>% 
-    select(tm, r, ra)
-}
-
-team_projections_2021 <-
-  step1 %>% 
-  apply_adjustments(step2) %>% 
-  apply_adjustments(step3)
 
 team_projections_2021 %>% 
   write_csv(here::here("out", "step4.csv"))
