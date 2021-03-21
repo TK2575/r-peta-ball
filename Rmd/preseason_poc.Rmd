@@ -150,25 +150,31 @@ team_projections_2021 <- step1
 
 Step 2: Calculate each team's cluster luck adjustments
 ```{r Step 2}
-team_stats_2020 <- 
-  team_stats_2020 %>% 
-  mutate(hits_per_run = (h / r_2020))
+iso_coefficient <- -11.72095212
+slg_coefficient <- 6.6236732
+obp_coefficient <- -8.192095152
+intercept_coefficient <- 3.715037045
 
-mean_hits_per_run <- 
-  mean(team_stats_2020$hits_per_run) %>% 
-  round(3)
-
-team_stats_2020 <- 
+team_stats_2020 <-
   team_stats_2020 %>% 
-  mutate(runs_exp = (h / mean_hits_per_run) %>% round(),
-         runs_a_exp = (ha / mean_hits_per_run) %>% round())
+  mutate(hits_per_run = 
+           (iso_coefficient * iso) +
+           (slg_coefficient * slg) +
+           (obp_coefficient * obp) +
+           intercept_coefficient,
+         hits_a_per_run = 
+           (iso_coefficient * iso_a) +
+           (slg_coefficient * slg_a) +
+           (obp_coefficient * obp_a) +
+           intercept_coefficient,
+         runs_exp = (h / hits_per_run) %>% round(),
+         runs_a_exp = (ha / hits_per_run) %>% round()) 
 
 step2 <-
   team_stats_2020 %>% 
-  mutate(runs_exp = (runs_exp * (games_2021 / g)) %>% round(),
-         runs_a_exp = (runs_a_exp * (games_2021 / g)) %>% round()) %>%
-    mutate(r = runs_exp - r_2021,
-           ra = runs_a_exp - ra_2021) %>% 
+  # FIXME runs_exp appear correct, runs_a_exp do not
+  mutate(r = (runs_exp - r_2020) * (games_2021 / g) %>% round(),
+         ra = (ra_2020 - runs_a_exp) * (games_2021 / g) %>% round()) %>% 
   select(tm, r, ra) 
 
 step2 %>% 
