@@ -179,13 +179,13 @@ team_projections_2021 <-
 Step 3: Calculate team offense and pitching WAR adjustments
 ```{r Step 3}
 
-step3a <-
+adjust_war <- function(last_year_results, this_year_projections) {
   team_projections_2021 %>% 
   rename(r_running_adj = r,
          ra_running_adj = ra) %>% 
   left_join(team_stats_2020) %>% 
-  left_join(batting_projections_2021) %>% 
-  left_join(batting_results_2020) %>% 
+  left_join(this_year_projections) %>% 
+  left_join(last_year_results) %>% 
   mutate(war_adj = (war * games_2021 / g) %>% round(2),
          war_diff = war_proj - war_adj,
          wp_diff = war_diff / games_2021,
@@ -193,24 +193,15 @@ step3a <-
          r_exponent = ra_running_adj^ex * (wp_diff + pyth_old) / (1 - (wp_diff + pyth_old)),
          ra_exponent = r_running_adj^ex * (1 - wp_diff - pyth_old) / (wp_diff + pyth_old),
          r = (r_exponent^(1/ex) - r_running_adj) %>% round(2),
-         ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2)) %>% 
+         ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2))
+}
+
+step3a <-
+  adjust_war(batting_results_2020, batting_projections_2021) %>% 
   select(tm, r)
 
 step3b <-
-  team_projections_2021 %>% 
-  rename(r_running_adj = r,
-         ra_running_adj = ra) %>% 
-  left_join(team_stats_2020) %>% 
-  left_join(pitching_projections_2021) %>% 
-  left_join(pitching_results_2020) %>% 
-  mutate(war_adj = (war * games_2021 / g) %>% round(2),
-         war_diff = war_proj - war_adj,
-         wp_diff = war_diff / games_2021,
-         pyth_old = r_running_adj^ex / (r_running_adj^ex + ra_running_adj^ex),
-         r_exponent = ra_running_adj^ex * (wp_diff + pyth_old) / (1 - (wp_diff + pyth_old)),
-         ra_exponent = r_running_adj^ex * (1 - wp_diff - pyth_old) / (wp_diff + pyth_old),
-         r = (r_exponent^(1/ex) - r_running_adj) %>% round(2),
-         ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2)) %>% 
+  adjust_war(pitching_results_2020, pitching_projections_2021) %>% 
   select(tm, ra)
   
 step3 <- 
