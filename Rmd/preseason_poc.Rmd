@@ -75,7 +75,9 @@ batting_results_2020 <-
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
-  select(tm, war)
+  select(tm, war) %>% 
+  left_join(team_batting_2020) %>% 
+  select(-year)
 
 batting_projections_2021 <-
   here::here("in", "2021_batting_projections.csv") %>%
@@ -92,7 +94,8 @@ pitching_results_2020 <-
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
-  select(tm, war)
+  select(tm, war) %>% left_join(team_batting_against_2020) %>% 
+  select(-year)
 
 pitching_projections_2021 <-
   here::here("in", "2021_pitching_projections.csv") %>%
