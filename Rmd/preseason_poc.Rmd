@@ -75,7 +75,7 @@ batting_results_2020 <-
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
-  select(tm, war) %>% 
+  select(tm, war, baseruns) %>% 
   left_join(team_batting_2020) %>% 
   select(-year)
 
@@ -94,7 +94,8 @@ pitching_results_2020 <-
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
-  select(tm, war) %>% left_join(team_batting_against_2020) %>% 
+  select(tm, war, baseruns_a) %>% 
+  left_join(team_batting_against_2020) %>% 
   select(-year)
 
 pitching_projections_2021 <-
@@ -112,8 +113,8 @@ Step 1 - Get Data
 ```{r Step 1} 
 team_stats_2020 <- 
   standings_2020 %>% 
-  full_join(team_batting_against_2020, by = c("year", "tm")) %>%
-  full_join(team_batting_2020, by = c("year", "tm"))
+  full_join(pitching_results_2020, by = c("tm")) %>%
+  full_join(batting_results_2020, by = c("tm"))
 
 runs_scored_adjustments <- 
   team_stats_2020 %>% 
@@ -167,14 +168,15 @@ team_stats_2020 <-
            (slg_coefficient * slg_a) +
            (obp_coefficient * obp_a) +
            intercept_coefficient,
-         runs_exp = (h / hits_per_run) %>% round(),
-         runs_a_exp = (ha / hits_per_run) %>% round()) 
+         runs_exp = (h / hits_per_run + baseruns)/2 %>% round(),
+         runs_a_exp = (ha / hits_a_per_run + baseruns_a)/2 %>% round()) # losing accuracy by rounding on intermediate steps
 
 step2 <-
   team_stats_2020 %>% 
-  # FIXME runs_exp appear correct, runs_a_exp do not
-  mutate(r = (runs_exp - r_2020) * (games_2021 / g) %>% round(),
-         ra = (ra_2020 - runs_a_exp) * (games_2021 / g) %>% round()) %>% 
+  mutate(r = (runs_exp - r_2020) * (games_2021 / g) %>% round(), # positive value means they were unlucky (runs were expected higher)
+         ra = (ra_2020 - runs_a_exp) * (games_2021 / g) %>% round()) %>% # positive value means they were unlucky (runs allowed were expected lower)
+   #FIXME the r_g initial stat in 2020 and all the rounding now gets inflated with the 162/60 correction. 
+  # is it possible to view intermediate tables as rounded, but keep the variables un-rounded?
   select(tm, r, ra) 
 
 step2 %>% 
