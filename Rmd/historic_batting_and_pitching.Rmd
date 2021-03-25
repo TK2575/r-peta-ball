@@ -13,7 +13,6 @@ library(tidyverse)
 library(baseballr)
 library(janitor)
 library(here)
-library(GGally)
 
 source(here::here("R", "scrape_bref.R"))
 ```
