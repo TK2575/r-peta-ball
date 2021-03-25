@@ -1,0 +1,73 @@
+---
+title: "Historic Batting & Pitching Analysis"
+author: "Tom & Will"
+date: "3/25/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(baseballr)
+library(janitor)
+library(here)
+library(GGally)
+
+source(here::here("R", "scrape_bref.R"))
+```
+
+```{r Get Historic Data}
+
+years <- c(2010:2019)
+
+batting_raw <-
+  years %>% 
+  map(team_batting) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  janitor::clean_names()
+
+pitching_raw <-
+  years %>% 
+  map(team_batting_against) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  janitor::clean_names()
+  
+```
+
+
+```{r Clean Data}
+
+batting <-
+  batting_raw %>% 
+  rename(ops_plus = ops_2) %>%
+  mutate(across(-tm, as.numeric)) %>% 
+  mutate(iso = slg - ba,
+         hits_per_run = h / r)
+
+pitching <- 
+  pitching_raw %>% 
+  mutate(across(-tm, as.numeric)) %>% 
+  mutate(iso = slg - ba,
+         hits_per_run = h /r)
+
+```
+
+
+```{r Regression Model}
+
+batting_model <- lm(hits_per_run ~ obp + slg + iso, batting)
+pitching_model <- lm(hits_per_run ~ obp + slg + iso, pitching)
+
+summary(batting_model)
+summary(pitching_model)
+
+```
+
+### Resources
+1. [Excel - Perform a regression analysis](https://support.microsoft.com/en-us/office/perform-a-regression-analysis-54f5c00e-0f51-4274-a4a7-ae46b418a23e)
+2. [Classical Multivariate Regression](https://cran.r-project.org/web/packages/rrr/vignettes/rrr.html)
+3. [EDUCBA - Multiple Linear Regression in R](https://www.educba.com/multiple-linear-regression-in-r/)
