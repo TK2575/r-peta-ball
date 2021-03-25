@@ -48,27 +48,13 @@ team_batting_2020 <-
   team_batting(2020) %>% 
   filter(!tm %in% c('LgAvg','LgTot')) %>% 
   janitor::clean_names() %>% 
-  select(year, tm, h, ba, obp, slg) %>% 
-  mutate(h = as.numeric(h), 
+  select(year, tm, r, h, ba, obp, slg) %>% 
+  mutate(r = as.numeric(r),
+         h = as.numeric(h), 
          ba = as.numeric(ba),
          obp = as.numeric(obp),
          slg = as.numeric(slg),
          iso = slg - ba)
-
-team_batting_against_2020 <- 
-  team_batting_against(2020) %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
-  janitor::clean_names() %>% 
-  select(year, tm, h, ba, obp, slg) %>% 
-  mutate(h = as.numeric(h),
-         ba = as.numeric(ba),
-         obp = as.numeric(obp),
-         slg = as.numeric(slg),
-         iso_a = slg - ba) %>% 
-  rename(ha = h,
-         ba_a = ba,
-         obp_a = obp,
-         slg_a = slg)
 
 batting_results_2020 <-
   here::here("in", "2020_batting_results.csv") %>% 
@@ -88,6 +74,23 @@ batting_projections_2021 <-
   summarize(war_proj = sum(war)) %>% 
   rename(tm=team) %>% 
   select(tm, war_proj)
+
+team_batting_against_2020 <- 
+  team_batting_against(2020) %>% 
+  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  janitor::clean_names() %>% 
+  select(year, tm, r, h, ba, obp, slg) %>% 
+  mutate(r = as.numeric(r),
+         h = as.numeric(h),
+         ba = as.numeric(ba),
+         obp = as.numeric(obp),
+         slg = as.numeric(slg),
+         iso_a = slg - ba) %>% 
+  rename(ra = r,
+         ha = h,
+         ba_a = ba,
+         obp_a = obp,
+         slg_a = slg)
 
 pitching_results_2020 <-
   here::here("in", "2020_pitching_results.csv") %>% 
@@ -111,31 +114,19 @@ pitching_projections_2021 <-
   
 Step 1 - Get Data
 ```{r Step 1} 
-team_stats_2020 <- 
+team_stats_2020 <-
   standings_2020 %>% 
-  full_join(pitching_results_2020, by = c("tm")) %>%
-  full_join(batting_results_2020, by = c("tm"))
-
-runs_scored_adjustments <- 
-  team_stats_2020 %>% 
-  mutate(r_162 = r_g * games_2021,
-         ra_162 = ra_g * games_2021,
-         r_60 = r_g * g,
-         ra_60 = ra_g * g) %>% 
-  select(tm, g, r_g, ra_g, r_162:ra_60) %>% 
-  summarize(teams = n(),
-            across(r_g:ra_60, sum)) %>% 
-  mutate(r_g_diff = (ra_g - r_g) / teams ,
-         r_162_diff = (ra_162 - r_162) / teams,
-         r_60_diff = (ra_60 - r_60) / teams) %>% 
-  select(r_g_diff:r_60_diff)
+  full_join(batting_results_2020, by = c("tm")) %>% 
+  select(-war) %>% 
+  full_join(pitching_results_2020, by = c("tm")) %>% 
+  select(-war)
 
 team_stats_2020 <- 
   team_stats_2020 %>% 
-  mutate(r_2020 = r_g * g + runs_scored_adjustments$r_60_diff,
-         ra_2020 = ra_g * g,
-         r_2021 = r_g * games_2021 + runs_scored_adjustments$r_162_diff,
-         ra_2021 = ra_g * games_2021)
+  rename(r_2020 = r,
+         ra_2020 = ra) %>% 
+  mutate(r_2021 = r_2020 * games_2021 / g,
+         ra_2021 = ra_2020 * games_2021 / g)
 
 step1 <-
   team_stats_2020 %>% 
