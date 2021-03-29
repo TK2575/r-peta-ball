@@ -247,7 +247,7 @@ runs_projected_2021 <-
             ra = sum(ra)) %>% 
   mutate(year = '2021')
 
-runs_pace_2020 <-
+runs_pace_2020 <- #how many runs would be scored by all teams in 162 games
   team_stats_2020 %>% 
   select(tm, g, r_2020:ra_2021) %>% 
   mutate(r_2020_162 = r_2020 * games_2021 / g,
@@ -257,32 +257,37 @@ runs_pace_2020 <-
          ra = ra_2020_162) %>% 
   mutate(year = '2020')
 
-team_count <-
+team_count <- 
   team_stats_2020 %>% 
   summarize(n = n()) %>% 
   pull()
   
 runs_projected_adjustments <-
-  tibble(r = (runs_pace_2020$r - runs_projected_2021$r) / team_count,
+  tibble(r = (runs_pace_2020$r - runs_projected_2021$r) / team_count, #total runs (per team) scored last year minus this year
          ra = (runs_pace_2020$ra - runs_projected_2021$ra) / team_count)
 
 team_projections_2021 <-
   team_projections_2021 %>% 
   rename(r_raw = r,
          ra_raw = ra) %>% 
-  mutate(r = r_raw + runs_projected_adjustments$r,
+  mutate(r = r_raw + runs_projected_adjustments$r, #add (or subtracts) runs to make the "run environments" the same between last year and this year
          ra = ra_raw + runs_projected_adjustments$ra)
 ```
 
 Step 6: Calculate expected wins via Pythagorean theorem
 ```{r Step 6}
+
 team_projections_2021 <- 
   team_projections_2021 %>% 
-  mutate(r_diff = r - ra,
+  mutate(r_2020_adj = step3a$r_2021 + runs_projected_adjustments$r,
+         ra_2020_adj = step3b$ra_2021 + runs_projected_adjustments$ra,
+         r_adjustment = r - r_2020_adj,
+         ra_adjustment = ra - ra_2020_adj,
+         r_diff = r - ra,
          r_g = r / games_2021,
          ra_g = ra / games_2021,
          wp = r^ex / (r^ex + ra^ex)) %>% 
-  select(tm, wp, r_diff, r_g, ra_g)
+  select(tm, wp, r, ra, r_2020_adj, ra_2020_adj, r_adjustment, ra_adjustment, r_diff, r_g, ra_g)
 
 team_projections_2021 %>% 
   arrange(wp %>% desc()) %>% 
