@@ -20,6 +20,7 @@ source(here::here("R", "scrape_bref.R"))
 ```{r Load Inputs}
 games_2021 <- 162
 ex <- 1.83
+last_ten_years <- c(2010:2019)
 
 apply_adjustments <- function(df1, df2) {
   df1 %>% 
@@ -111,6 +112,18 @@ pitching_projections_2021 <-
   summarize(war_proj = sum(war)) %>% 
   rename(tm=team) %>% 
   select(tm, war_proj)
+
+historic_batting <-
+  last_ten_years %>% 
+  map(team_batting) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  janitor::clean_names() %>% 
+  rename(ops_plus = ops_2) %>%
+  mutate(across(-tm, as.numeric)) %>% 
+  mutate(iso = slg - ba,
+         hits_per_run = h / r)
+
 ```
   
 Step 1 - Get Data
@@ -143,10 +156,15 @@ team_projections_2021 <- step1
 
 Step 2: Calculate each team's cluster luck adjustments
 ```{r Step 2}
-iso_coefficient <- -11.72095212
-slg_coefficient <- 6.6236732
-obp_coefficient <- -8.192095152
-intercept_coefficient <- 3.715037045
+
+hpr_model <- 
+  historic_batting %>% 
+  lm(hits_per_run ~ obp + slg + iso, .)
+
+intercept_coefficient <- hpr_model$coefficients[[1]]
+obp_coefficient <- hpr_model$coefficients[[2]]
+slg_coefficient <- hpr_model$coefficients[[3]]
+iso_coefficient <- hpr_model$coefficients[[4]]
 
 team_stats_2020 <-
   team_stats_2020 %>% 
@@ -247,7 +265,8 @@ runs_projected_2021 <-
             ra = sum(ra)) %>% 
   mutate(year = '2021')
 
-runs_pace_2020 <- #how many runs would be scored by all teams in 162 games
+runs_pace_2020 <-
+  #how many runs would be scored by all teams in 162 games
   team_stats_2020 %>% 
   select(tm, g, r_2020:ra_2021) %>% 
   mutate(r_2020_162 = r_2020 * games_2021 / g,
@@ -263,14 +282,16 @@ team_count <-
   pull()
   
 runs_projected_adjustments <-
-  tibble(r = (runs_pace_2020$r - runs_projected_2021$r) / team_count, #total runs (per team) scored last year minus this year
+  tibble(r = (runs_pace_2020$r - runs_projected_2021$r) / team_count, 
+         #total runs (per team) scored last year minus this year
          ra = (runs_pace_2020$ra - runs_projected_2021$ra) / team_count)
 
 team_projections_2021 <-
   team_projections_2021 %>% 
   rename(r_raw = r,
          ra_raw = ra) %>% 
-  mutate(r = r_raw + runs_projected_adjustments$r, #add (or subtracts) runs to make the "run environments" the same between last year and this year
+  mutate(r = r_raw + runs_projected_adjustments$r, 
+         #add (or subtracts) runs to make the "run environments" the same between last year and this year
          ra = ra_raw + runs_projected_adjustments$ra)
 ```
 
@@ -324,6 +345,5 @@ wp_comparison_plot <-
   geom_abline(slope=1)
 
 ggplotly(wp_comparison_plot)
-
 
 ```
