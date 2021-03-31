@@ -1,0 +1,50 @@
+---
+title: "2021 MLB Regular Season Win Total Odds"
+author: "Tom Kain"
+date: "3/30/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rvest)
+library(xml2)
+library(tidyverse)
+library(janitor)
+library(here)
+```
+
+```{r} 
+
+url <- "https://www.vegasinsider.com/mlb/odds/win-totals/"
+
+odds_table <-
+  url %>% 
+  read_html() %>%
+  html_nodes("table") %>% 
+  html_table(fill = TRUE) %>% 
+  .[[8]] %>% 
+  janitor::row_to_names(1) %>% 
+  as_tibble() %>% 
+  janitor::clean_names() %>% 
+  mutate(win_total = as.numeric(win_total)) %>% 
+  rename(team_name = team)
+
+team_abbreviation_map <-
+  here::here("in", "team_abbrevation_map.csv") %>% 
+  readr::read_csv() %>% 
+  janitor::clean_names() %>% 
+  select(tm, team_name)
+
+odds_table <-
+  odds_table %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, win_total) 
+
+odds_table %>% 
+  write_csv(here::here("out", 
+                       "regular_season_win_total_odds_2021.csv"))
+
+```

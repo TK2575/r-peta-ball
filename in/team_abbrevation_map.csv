@@ -1,32 +1,32 @@
-tm,team
-LAA,Angels
-HOU,Astros
-OAK,Athletics
-TOR,Blue Jays
-ATL,Braves
-MIL,Brewers
-STL,Cardinals
-CHC,Cubs
-ARI,Diamondbacks
-LAD,Dodgers
-SFG,Giants
-CLE,Indians
-CLE,Cleveland
-SEA,Mariners
-MIA,Marlins
-NYM,Mets
-WSN,Nationals
-BAL,Orioles
-SDP,Padres
-PHI,Phillies
-PIT,Pirates
-TEX,Rangers
-TBR,Rays
-BOS,Red Sox
-CIN,Reds
-COL,Rockies
-KCR,Royals
-DET,Tigers
-MIN,Twins
-CHW,White Sox
-NYY,Yankees
+tm,team,team_name
+LAA,Angels,Los Angeles Angels
+HOU,Astros,Houston Astros
+OAK,Athletics,Oakland Athletics
+TOR,Blue Jays,Toronto Blue Jays
+ATL,Braves,Atlanta Braves
+MIL,Brewers,Milwaukee Brewers
+STL,Cardinals,St. Louis Cardinals
+CHC,Cubs,Chicago Cubs
+ARI,Diamondbacks,Arizona Diamondbacks
+LAD,Dodgers,Los Angeles Dodgers
+SFG,Giants,San Francisco Giants
+CLE,Indians,Cleveland Indians
+CLE,Cleveland,Cleveland Indians
+SEA,Mariners,Seattle Mariners
+MIA,Marlins,Miami Marlins
+NYM,Mets,New York Mets
+WSN,Nationals,Washington Nationals
+BAL,Orioles,Baltimore Orioles
+SDP,Padres,San Diego Padres
+PHI,Phillies,Philadelphia Phillies
+PIT,Pirates,Pittsburgh Pirates
+TEX,Rangers,Texas Rangers
+TBR,Rays,Tampa Bay Rays
+BOS,Red Sox,Boston Red Sox
+CIN,Reds,Cincinnati Reds
+COL,Rockies,Colorado Rockies
+KCR,Royals,Kansas City Royals
+DET,Tigers,Detroit Tigers
+MIN,Twins,Minnesota Twins
+CHW,White Sox,Chicago White Sox
+NYY,Yankees,New York Yankees

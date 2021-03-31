@@ -9,6 +9,8 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(rvest)
+library(xml2)
 library(plotly)
 library(tidyverse)
 library(baseballr)
@@ -124,7 +126,8 @@ historic_batting <-
   mutate(iso = slg - ba,
          hits_per_run = h / r)
 
-fangraphs_projections_url <- "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
+fangraphs_projections_url <- 
+  "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
   
 fangraphs_projections <-
   fangraphs_projections_url %>%
@@ -352,4 +355,28 @@ wins_proj_plot <-
 
 ggplotly(wins_proj_plot)
 
+```
+
+```{r}
+
+odds_table <-
+  here::here("out",
+             "regular_season_win_total_odds_2021.csv") %>% 
+  read_csv() %>% 
+  rename(w_odds = win_total)
+
+odds_comparison <-
+  projection_comparison %>% 
+  left_join(odds_table) %>% 
+  select(tm, w_us, w_odds) %>% 
+  mutate(diff = w_us - w_odds)
+
+odds_comparison %>% 
+  ggplot(aes(diff)) +
+  geom_histogram(binwidth = 4)
+
+odds_comparison %>% 
+  filter(abs(diff) > 4) %>% 
+  arrange(abs(diff) %>% desc)
+  
 ```
