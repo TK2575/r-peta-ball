@@ -69,6 +69,7 @@ batting_results_2020 <-
   left_join(team_batting_2020) %>% 
   select(-year)
 
+# https://www.fangraphs.com/projections.aspx?pos=all&stats=bat&type=fangraphsdc
 batting_projections_2021 <-
   here::here("in", "2021_batting_projections.csv") %>%
   readr::read_csv() %>% 
@@ -105,6 +106,7 @@ pitching_results_2020 <-
   left_join(team_batting_against_2020) %>% 
   select(-year)
 
+# https://www.fangraphs.com/projections.aspx?pos=all&stats=pit&type=fangraphsdc&team=0&lg=all&players=0
 pitching_projections_2021 <-
   here::here("in", "2021_pitching_projections.csv") %>%
   readr::read_csv() %>% 
@@ -377,6 +379,7 @@ odds_comparison %>%
 
 odds_comparison %>% 
   filter(abs(diff) > 4) %>% 
-  arrange(abs(diff) %>% desc)
+  arrange(abs(diff) %>% desc) %>% 
+  write_csv(here::here("out", "potential_bets.csv"))
   
 ```
