@@ -124,6 +124,23 @@ historic_batting <-
   mutate(iso = slg - ba,
          hits_per_run = h / r)
 
+fangraphs_projections_url <- "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
+  
+fangraphs_projections <-
+  fangraphs_projections_url %>%
+  read_html() %>%
+  html_nodes("table") %>%
+  html_table() %>%
+  .[[8]] %>%
+  as_tibble() %>%
+  select(1, 16:21) %>%
+  janitor::row_to_names(2) %>%
+  janitor::clean_names() %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, w:ra_g) %>% 
+  rename(wp = w_percent) %>% 
+  mutate(across(-tm, as.numeric))
+
 ```
   
 Step 1 - Get Data
@@ -318,32 +335,21 @@ team_projections_2021 %>%
 
 ```{r Compare to Fangraphs}
 
-fangraphs_projections_url <- "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
-  
-fangraphs_projections <-
-  fangraphs_projections_url %>%
-  read_html() %>%
-  html_nodes("table") %>%
-  html_table() %>%
-  .[[8]] %>%
-  as_tibble() %>%
-  select(1, 16:21) %>%
-  janitor::row_to_names(2) %>%
-  janitor::clean_names() %>% 
-  left_join(team_abbreviation_map) %>% 
-  select(tm, w:ra_g) %>% 
-  rename(wp = w_percent) %>% 
-  mutate(across(-tm, as.numeric))
-
-
-wp_comparison_plot <-
+projection_comparison <-
   team_projections_2021 %>% 
-  left_join(fangraphs_projections, by = "tm", suffix = c("_us", "_fangraphs")) %>% 
-  select(tm, wp_us, wp_fangraphs) %>% 
-  ggplot(aes(wp_us, wp_fangraphs, color=tm)) +
-  geom_point() +
-  geom_abline(slope=1)
+  left_join(fangraphs_projections, 
+            by = "tm", 
+            suffix = c("_us", "_fangraphs")) %>% 
+  rename(w_fangraphs = w) %>% 
+    mutate(w_us = (games_2021 * wp_us) %>% round)
 
-ggplotly(wp_comparison_plot)
+wins_proj_plot <-
+  projection_comparison %>% 
+    select(tm, w_fangraphs, w_us) %>% 
+    ggplot(aes(w_fangraphs, w_us, color=tm)) +
+    geom_point() +
+    geom_abline(slope=1)
+
+ggplotly(wins_proj_plot)
 
 ```
