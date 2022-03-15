@@ -19,7 +19,7 @@ source(here::here("R", "scrape_bref.R"))
 
 ```{r Get Historic Data}
 
-years <- c(2010:2019)
+years <- c(2010:2019, 2021)
 
 batting_raw <-
   years %>% 

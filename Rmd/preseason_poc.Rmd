@@ -20,9 +20,11 @@ source(here::here("R", "scrape_bref.R"))
 ```
 
 ```{r Load Inputs}
-games_2021 <- 162
+last_year <- 2021
+this_year <- 2022
+games_this_year <- 162
 ex <- 1.83
-last_ten_years <- c(2010:2019)
+last_ten_years <- c(2011:2019,last_year)
 
 apply_adjustments <- function(df1, df2) {
   df1 %>% 
@@ -37,19 +39,20 @@ team_abbreviation_map <-
   readr::read_csv() %>% 
   janitor::clean_names()
 
-standings_2020 <- 
-  standings_expanded(2020) %>% 
+standings_last_year <- 
+  standings_expanded(last_year) %>% 
   filter(tm != 'Avg') %>% 
   mutate(tm = tm %>% stringr::str_sub(start=-3)) %>% 
   janitor::clean_names() %>% 
-  select(year, tm, g:w_l_percent, r, ra) %>% 
-  mutate(r = as.numeric(r),
+  select(year, tm, w:w_l_percent, r, ra) %>% 
+  mutate(g = w+l,
+         r = as.numeric(r),
          ra = as.numeric(ra)) %>% 
   rename(r_g = r,
          ra_g = ra)
 
-team_batting_2020 <- 
-  team_batting(2020) %>% 
+team_batting_last_year <- 
+  team_batting(last_year) %>% 
   filter(!tm %in% c('LgAvg','LgTot')) %>% 
   janitor::clean_names() %>% 
   select(year, tm, r, h, ba, obp, slg) %>% 
@@ -60,18 +63,19 @@ team_batting_2020 <-
          slg = as.numeric(slg),
          iso = slg - ba)
 
-batting_results_2020 <-
-  here::here("in", "2020_batting_results.csv") %>% 
+batting_results_last_year <-
+  here::here("in", "last_year_batting_results.csv") %>% 
   readr::read_csv() %>% 
+  rename(baseruns = BsR) %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
   select(tm, war, baseruns) %>% 
-  left_join(team_batting_2020) %>% 
+  left_join(team_batting_last_year) %>% 
   select(-year)
 
 # https://www.fangraphs.com/projections.aspx?pos=all&stats=bat&type=fangraphsdc
-batting_projections_2021 <-
-  here::here("in", "2021_batting_projections.csv") %>%
+batting_projections_this_year <-
+  here::here("in", "this_year_batting_projections.csv") %>%
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   dplyr::filter(!is.na(team)) %>% 
@@ -80,8 +84,8 @@ batting_projections_2021 <-
   rename(tm=team) %>% 
   select(tm, war_proj)
 
-team_batting_against_2020 <- 
-  team_batting_against(2020) %>% 
+team_batting_against_last_year <- 
+  team_batting_against(last_year) %>% 
   filter(!tm %in% c('LgAvg','LgTot')) %>% 
   janitor::clean_names() %>% 
   select(year, tm, r, h, ba, obp, slg) %>% 
@@ -97,18 +101,19 @@ team_batting_against_2020 <-
          obp_a = obp,
          slg_a = slg)
 
-pitching_results_2020 <-
-  here::here("in", "2020_pitching_results.csv") %>% 
+pitching_results_last_year <-
+  here::here("in", "last_year_pitching_results.csv") %>% 
   readr::read_csv() %>% 
+  rename(baseruns_a = BsR) %>% 
   janitor::clean_names() %>% 
   left_join(team_abbreviation_map) %>% 
   select(tm, war, baseruns_a) %>% 
-  left_join(team_batting_against_2020) %>% 
+  left_join(team_batting_against_last_year) %>% 
   select(-year)
 
 # https://www.fangraphs.com/projections.aspx?pos=all&stats=pit&type=fangraphsdc&team=0&lg=all&players=0
-pitching_projections_2021 <-
-  here::here("in", "2021_pitching_projections.csv") %>%
+pitching_projections_this_year <-
+  here::here("in", "this_year_pitching_projections.csv") %>%
   readr::read_csv() %>% 
   janitor::clean_names() %>% 
   dplyr::filter(!is.na(team)) %>% 
@@ -147,36 +152,38 @@ fangraphs_projections <-
   mutate(across(-tm, as.numeric))
 
 ```
-  
+
 Step 1 - Get Data
-```{r Step 1} 
-team_stats_2020 <-
-  standings_2020 %>% 
-  full_join(batting_results_2020, by = c("tm")) %>% 
+
+```{r Step 1}
+team_stats_last_year <-
+  standings_last_year %>% 
+  full_join(batting_results_last_year, by = c("tm")) %>% 
   select(-war) %>% 
-  full_join(pitching_results_2020, by = c("tm")) %>% 
+  full_join(pitching_results_last_year, by = c("tm")) %>% 
   select(-war)
 
-team_stats_2020 <- 
-  team_stats_2020 %>% 
-  rename(r_2020 = r,
-         ra_2020 = ra) %>% 
-  mutate(r_2021 = (r_2020 * games_2021 / g) %>% round(2),
-         ra_2021 = (ra_2020 * games_2021 / g) %>% round(2))
+team_stats_last_year <- 
+  team_stats_last_year %>% 
+  rename(r_last_year = r,
+         ra_last_year = ra) %>% 
+  mutate(r_this_year = (r_last_year * games_this_year / g) %>% round(2),
+         ra_this_year = (ra_last_year * games_this_year / g) %>% round(2))
 
 step1 <-
-  team_stats_2020 %>% 
-  select(tm, r_2021, ra_2021) %>% 
-  rename(r = r_2021,
-         ra = ra_2021)
+  team_stats_last_year %>% 
+  select(tm, r_this_year, ra_this_year) %>% 
+  rename(r = r_this_year,
+         ra = ra_this_year)
 
 step1 %>% 
   write_csv(here::here("out", "step1.csv"))
 
-team_projections_2021 <- step1
+team_projections_this_year <- step1
 ```
 
 Step 2: Calculate each team's cluster luck adjustments
+
 ```{r Step 2}
 
 hpr_model <- 
@@ -188,8 +195,8 @@ obp_coefficient <- hpr_model$coefficients[[2]]
 slg_coefficient <- hpr_model$coefficients[[3]]
 iso_coefficient <- hpr_model$coefficients[[4]]
 
-team_stats_2020 <-
-  team_stats_2020 %>% 
+team_stats_last_year <-
+  team_stats_last_year %>% 
   mutate(hits_per_run = 
            (iso_coefficient * iso) +
            (slg_coefficient * slg) +
@@ -204,38 +211,39 @@ team_stats_2020 <-
          runs_a_exp = (ha / hits_a_per_run + baseruns_a)/2)
 
 step2 <-
-  team_stats_2020 %>% 
+  team_stats_last_year %>% 
   mutate(
     # positive value means they were unlucky (runs were expected higher)    
-    r = ((runs_exp - r_2020) * (games_2021 / g)) %>% round(2), 
+    r = ((runs_exp - r_last_year) * (games_this_year / g)) %>% round(2), 
     # positive value means they were unlucky (runs allowed were expected lower)    
-    ra = ((ra_2020 - runs_a_exp) * (games_2021 / g)) %>% round(2)) %>%
+    ra = ((ra_last_year - runs_a_exp) * (games_this_year / g)) %>% round(2)) %>%
   select(tm, r, ra) 
 
 step2 %>% 
   write_csv(here::here("out", "step2.csv"))
 
-team_projections_2021 <- 
-  apply_adjustments(team_projections_2021, step2)
+team_projections_this_year <- 
+  apply_adjustments(team_projections_this_year, step2)
 
 ```
 
 Step 3: Calculate team offense and pitching WAR adjustments
+
 ```{r Step 3}
 
 adjust_war <- function(last_year_results, 
                        this_year_projections) {
-  team_projections_2021 %>% 
+  team_projections_this_year %>% 
     rename(r_running_adj = r, 
            ra_running_adj = ra) %>% 
-    left_join(team_stats_2020, by = "tm") %>% 
+    left_join(team_stats_last_year, by = "tm") %>% 
     left_join(this_year_projections, by = "tm") %>% 
     left_join(last_year_results, 
               by = "tm", 
               suffix = c("_proj","")) %>% 
-    mutate(war_adj = (war * games_2021 / g) %>% round(2),
+    mutate(war_adj = (war * games_this_year / g) %>% round(2),
            war_diff = war_proj - war_adj,
-           wp_diff = war_diff / games_2021,
+           wp_diff = war_diff / games_this_year,
            pyth_old = r_running_adj^ex / 
              (r_running_adj^ex + ra_running_adj^ex),
            r_exponent = ra_running_adj^ex * (wp_diff + pyth_old) /
@@ -248,10 +256,10 @@ adjust_war <- function(last_year_results,
 }
 
 step3a <-
-  adjust_war(batting_results_2020, batting_projections_2021)
+  adjust_war(batting_results_last_year, batting_projections_this_year)
   
 step3b <-
-  adjust_war(pitching_results_2020, pitching_projections_2021)
+  adjust_war(pitching_results_last_year, pitching_projections_this_year)
   
 step3 <- 
   step3a %>%
@@ -264,52 +272,54 @@ step3a %>% write_csv(here::here("out", "step3a.csv"))
 step3b %>% write_csv(here::here("out", "step3b.csv"))
 step3 %>% write_csv(here::here("out", "step3.csv"))
 
-team_projections_2021 <- 
-  apply_adjustments(team_projections_2021, step3)
+team_projections_this_year <- 
+  apply_adjustments(team_projections_this_year, step3)
 
 ```
 
 Step 4: Sum up adjustments
+
 ```{r Step 4}
 
-team_projections_2021 %>% 
+team_projections_this_year %>% 
   write_csv(here::here("out", "step4.csv"))
 
 ```
 
 Step 5: Normalize all RS/RA to last year's environment of total runs
-```{r Step 5}
-# add the correct number of runs/allowed to each team so that the total projected for 2021 equals the 2020 162 game page
 
-runs_projected_2021 <- 
-  team_projections_2021 %>% 
+```{r Step 5}
+# add the correct number of runs/allowed to each team so that the total projected for this year equals the last year's 162 game page
+
+runs_projected_this_year <- 
+  team_projections_this_year %>% 
   summarize(r = sum(r),
             ra = sum(ra)) %>% 
-  mutate(year = '2021')
+  mutate(year = this_year)
 
-runs_pace_2020 <-
+runs_pace_last_year <-
   #how many runs would be scored by all teams in 162 games
-  team_stats_2020 %>% 
-  select(tm, g, r_2020:ra_2021) %>% 
-  mutate(r_2020_162 = r_2020 * games_2021 / g,
-         ra_2020_162 = ra_2020 * games_2021 / g) %>% 
-  summarize(across(r_2020_162:ra_2020_162, sum)) %>% 
-  rename(r = r_2020_162,
-         ra = ra_2020_162) %>% 
-  mutate(year = '2020')
+  team_stats_last_year %>% 
+  select(tm, g, r_last_year:ra_this_year) %>% 
+  mutate(r_last_year_162 = r_last_year * games_this_year / g,
+         ra_last_year_162 = ra_last_year * games_this_year / g) %>% 
+  summarize(across(r_last_year_162:ra_last_year_162, sum)) %>% 
+  rename(r = r_last_year_162,
+         ra = ra_last_year_162) %>% 
+  mutate(year = last_year)
 
 team_count <- 
-  team_stats_2020 %>% 
+  team_stats_last_year %>% 
   summarize(n = n()) %>% 
   pull()
   
 runs_projected_adjustments <-
-  tibble(r = (runs_pace_2020$r - runs_projected_2021$r) / team_count, 
+  tibble(r = (runs_pace_last_year$r - runs_projected_this_year$r) / team_count, 
          #total runs (per team) scored last year minus this year
-         ra = (runs_pace_2020$ra - runs_projected_2021$ra) / team_count)
+         ra = (runs_pace_last_year$ra - runs_projected_this_year$ra) / team_count)
 
-team_projections_2021 <-
-  team_projections_2021 %>% 
+team_projections_this_year <-
+  team_projections_this_year %>% 
   rename(r_raw = r,
          ra_raw = ra) %>% 
   mutate(r = r_raw + runs_projected_adjustments$r, 
@@ -318,21 +328,22 @@ team_projections_2021 <-
 ```
 
 Step 6: Calculate expected wins via Pythagorean theorem
+
 ```{r Step 6}
 
-team_projections_2021 <- 
-  team_projections_2021 %>% 
-  mutate(r_2020_adj = step3a$r_2021 + runs_projected_adjustments$r,
-         ra_2020_adj = step3b$ra_2021 + runs_projected_adjustments$ra,
-         r_adjustment = r - r_2020_adj,
-         ra_adjustment = ra - ra_2020_adj,
+team_projections_this_year <- 
+  team_projections_this_year %>% 
+  mutate(r_last_year_adj = step3a$r_this_year + runs_projected_adjustments$r,
+         ra_last_year_adj = step3b$ra_this_year + runs_projected_adjustments$ra,
+         r_adjustment = r - r_last_year_adj,
+         ra_adjustment = ra - ra_last_year_adj,
          r_diff = r - ra,
-         r_g = r / games_2021,
-         ra_g = ra / games_2021,
+         r_g = r / games_this_year,
+         ra_g = ra / games_this_year,
          wp = r^ex / (r^ex + ra^ex)) %>% 
-  select(tm, wp, r, ra, r_2020_adj, ra_2020_adj, r_adjustment, ra_adjustment, r_diff, r_g, ra_g)
+  select(tm, wp, r, ra, r_last_year_adj, ra_last_year_adj, r_adjustment, ra_adjustment, r_diff, r_g, ra_g)
 
-team_projections_2021 %>% 
+team_projections_this_year %>% 
   arrange(wp %>% desc()) %>% 
   mutate_if(is.numeric, ~round(., 3)) %>% 
   write_csv(here::here("out", "step5.csv"))
@@ -341,12 +352,12 @@ team_projections_2021 %>%
 ```{r Compare to Fangraphs}
 
 projection_comparison <-
-  team_projections_2021 %>% 
+  team_projections_this_year %>% 
   left_join(fangraphs_projections, 
             by = "tm", 
             suffix = c("_us", "_fangraphs")) %>% 
   rename(w_fangraphs = w) %>% 
-    mutate(w_us = (games_2021 * wp_us) %>% round)
+    mutate(w_us = (games_this_year * wp_us) %>% round)
 
 wins_proj_plot <-
   projection_comparison %>% 
@@ -363,7 +374,7 @@ ggplotly(wins_proj_plot)
 
 odds_table <-
   here::here("out",
-             "regular_season_win_total_odds_2021.csv") %>% 
+             "regular_season_win_total_odds_this_year.csv") %>% 
   read_csv() %>% 
   rename(w_odds = win_total)
 
