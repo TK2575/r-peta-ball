@@ -1,32 +1,34 @@
-tm,team,team_name
-LAA,Angels,Los Angeles Angels
-HOU,Astros,Houston Astros
-OAK,Athletics,Oakland Athletics
-TOR,Blue Jays,Toronto Blue Jays
-ATL,Braves,Atlanta Braves
-MIL,Brewers,Milwaukee Brewers
-STL,Cardinals,St. Louis Cardinals
-CHC,Cubs,Chicago Cubs
-ARI,Diamondbacks,Arizona Diamondbacks
-LAD,Dodgers,Los Angeles Dodgers
-SFG,Giants,San Francisco Giants
-CLE,Indians,Cleveland Indians
-CLE,Cleveland,Cleveland Indians
-SEA,Mariners,Seattle Mariners
-MIA,Marlins,Miami Marlins
-NYM,Mets,New York Mets
-WSN,Nationals,Washington Nationals
-BAL,Orioles,Baltimore Orioles
-SDP,Padres,San Diego Padres
-PHI,Phillies,Philadelphia Phillies
-PIT,Pirates,Pittsburgh Pirates
-TEX,Rangers,Texas Rangers
-TBR,Rays,Tampa Bay Rays
-BOS,Red Sox,Boston Red Sox
-CIN,Reds,Cincinnati Reds
-COL,Rockies,Colorado Rockies
-KCR,Royals,Kansas City Royals
-DET,Tigers,Detroit Tigers
-MIN,Twins,Minnesota Twins
-CHW,White Sox,Chicago White Sox
-NYY,Yankees,New York Yankees
+tm,team,team_name,league
+LAA,Angels,Los Angeles Angels,AL
+LAA,Angels,Los Angeles Angels of Anaheim,AL
+HOU,Astros,Houston Astros,AL
+OAK,Athletics,Oakland Athletics,AL
+TOR,Blue Jays,Toronto Blue Jays,AL
+ATL,Braves,Atlanta Braves,NL
+MIL,Brewers,Milwaukee Brewers,NL
+STL,Cardinals,St. Louis Cardinals,NL
+CHC,Cubs,Chicago Cubs,NL
+ARI,Diamondbacks,Arizona Diamondbacks,NL
+LAD,Dodgers,Los Angeles Dodgers,NL
+SFG,Giants,San Francisco Giants,NL
+CLE,Indians,Cleveland Indians,AL
+CLE,Cleveland,Cleveland Guardians,AL
+CLE,Guardians,Cleveland Guardians,AL
+SEA,Mariners,Seattle Mariners,AL
+MIA,Marlins,Miami Marlins,NL
+NYM,Mets,New York Mets,NL
+WSN,Nationals,Washington Nationals,NL
+BAL,Orioles,Baltimore Orioles,AL
+SDP,Padres,San Diego Padres,NL
+PHI,Phillies,Philadelphia Phillies,NL
+PIT,Pirates,Pittsburgh Pirates,NL
+TEX,Rangers,Texas Rangers,AL
+TBR,Rays,Tampa Bay Rays,AL
+BOS,Red Sox,Boston Red Sox,AL
+CIN,Reds,Cincinnati Reds,NL
+COL,Rockies,Colorado Rockies,NL
+KCR,Royals,Kansas City Royals,AL
+DET,Tigers,Detroit Tigers,AL
+MIN,Twins,Minnesota Twins,AL
+CHW,White Sox,Chicago White Sox,AL
+NYY,Yankees,New York Yankees,AL
