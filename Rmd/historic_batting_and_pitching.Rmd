@@ -25,14 +25,14 @@ batting_raw <-
   years %>% 
   map(team_batting) %>% 
   bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
 pitching_raw <-
   years %>% 
   map(team_batting_against) %>% 
   bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
 team_abbreviation_map <-
@@ -48,7 +48,6 @@ team_abbreviation_map <-
 batting <-
   batting_raw %>%
   rename(team_name = tm) %>% 
-  filter(team_name != 'League Average') %>% 
   left_join(team_abbreviation_map) %>% 
   rename(ops_plus = ops_2) %>% 
   select(year, league, tm, number_bat:lob) %>% 

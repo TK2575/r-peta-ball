@@ -19,12 +19,12 @@ library(here)
 source(here::here("R", "scrape_bref.R"))
 ```
 
-```{r Load Inputs}
+```{r constants_and_functions}
 last_year <- 2021
 this_year <- 2022
 games_this_year <- 162
 ex <- 1.83
-last_ten_years <- c(2011:2019,last_year)
+last_ten_years <- c((last_year-9):last_year)
 
 apply_adjustments <- function(df1, df2) {
   df1 %>% 
@@ -34,44 +34,33 @@ apply_adjustments <- function(df1, df2) {
     select(tm, r, ra)
 }
 
+```
+
+```{r raw_inputs} 
+
 team_abbreviation_map <-
   here::here("in", "team_abbrevation_map.csv") %>% 
   readr::read_csv() %>% 
   janitor::clean_names()
 
-standings_last_year <- 
+standings_last_year_raw <- 
   standings_expanded(last_year) %>% 
   filter(tm != 'Avg') %>% 
-  mutate(tm = tm %>% stringr::str_sub(start=-3)) %>% 
-  janitor::clean_names() %>% 
-  select(year, tm, w:w_l_percent, r, ra) %>% 
-  mutate(g = w+l,
-         r = as.numeric(r),
-         ra = as.numeric(ra)) %>% 
-  rename(r_g = r,
-         ra_g = ra)
+  janitor::clean_names() 
 
-team_batting_last_year <- 
-  team_batting(last_year) %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
-  janitor::clean_names() %>% 
-  select(year, tm, r, h, ba, obp, slg) %>% 
-  mutate(r = as.numeric(r),
-         h = as.numeric(h), 
-         ba = as.numeric(ba),
-         obp = as.numeric(obp),
-         slg = as.numeric(slg),
-         iso = slg - ba)
+batting_historic_raw <-
+  last_ten_years %>% 
+  map(team_batting) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
+  janitor::clean_names()
 
-batting_results_last_year <-
-  here::here("in", "last_year_batting_results.csv") %>% 
-  readr::read_csv() %>% 
-  rename(baseruns = BsR) %>% 
-  janitor::clean_names() %>% 
-  left_join(team_abbreviation_map) %>% 
-  select(tm, war, baseruns) %>% 
-  left_join(team_batting_last_year) %>% 
-  select(-year)
+batting_against_raw <- 
+  last_ten_years %>% 
+  map(team_batting_against) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
+  janitor::clean_names()
 
 # https://www.fangraphs.com/projections.aspx?pos=all&stats=bat&type=fangraphsdc
 batting_projections_this_year <-
@@ -84,33 +73,6 @@ batting_projections_this_year <-
   rename(tm=team) %>% 
   select(tm, war_proj)
 
-team_batting_against_last_year <- 
-  team_batting_against(last_year) %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
-  janitor::clean_names() %>% 
-  select(year, tm, r, h, ba, obp, slg) %>% 
-  mutate(r = as.numeric(r),
-         h = as.numeric(h),
-         ba = as.numeric(ba),
-         obp = as.numeric(obp),
-         slg = as.numeric(slg),
-         iso_a = slg - ba) %>% 
-  rename(ra = r,
-         ha = h,
-         ba_a = ba,
-         obp_a = obp,
-         slg_a = slg)
-
-pitching_results_last_year <-
-  here::here("in", "last_year_pitching_results.csv") %>% 
-  readr::read_csv() %>% 
-  rename(baseruns_a = BsR) %>% 
-  janitor::clean_names() %>% 
-  left_join(team_abbreviation_map) %>% 
-  select(tm, war, baseruns_a) %>% 
-  left_join(team_batting_against_last_year) %>% 
-  select(-year)
-
 # https://www.fangraphs.com/projections.aspx?pos=all&stats=pit&type=fangraphsdc&team=0&lg=all&players=0
 pitching_projections_this_year <-
   here::here("in", "this_year_pitching_projections.csv") %>%
@@ -121,17 +83,6 @@ pitching_projections_this_year <-
   summarize(war_proj = sum(war)) %>% 
   rename(tm=team) %>% 
   select(tm, war_proj)
-
-historic_batting <-
-  last_ten_years %>% 
-  map(team_batting) %>% 
-  bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
-  janitor::clean_names() %>% 
-  rename(ops_plus = ops_2) %>%
-  mutate(across(-tm, as.numeric)) %>% 
-  mutate(iso = slg - ba,
-         hits_per_run = h / r)
 
 fangraphs_projections_url <- 
   "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
@@ -153,23 +104,88 @@ fangraphs_projections <-
 
 ```
 
+
+```{r prep inputs}
+
+standings_last_year <- 
+  standings_last_year_raw %>% 
+  mutate(tm = tm %>% stringr::str_sub(start=-3)) %>% 
+  select(year, tm, w:w_l_percent, r, ra) %>% 
+  mutate(g = w+l,
+         r = as.numeric(r),
+         ra = as.numeric(ra)) %>% 
+  rename(r_g = r,
+         ra_g = ra)
+
+batting_historic <-
+  batting_historic_raw %>% 
+  rename(team_name = tm) %>% 
+  left_join(team_abbreviation_map) %>% 
+  rename(ops_plus = ops_2) %>% 
+  select(year, league, tm, number_bat:lob) %>% 
+  mutate(across(!c(tm, league), as.numeric)) %>% 
+  mutate(iso = slg - ba,
+         hits_per_run = h / r,
+         br_a = h + bb + hbp -(.5*ibb) - hr,
+         br_b = 1.1 * ((1.4*slg*ab) - (.6*h) - (3*hr) - (.1*(bb+hbp-ibb)) + (.9*(sb-cs-gdp))),
+         br_c = pa - bb - sf - sh - hbp - h + cs + gdp,
+         br_raw = br_a*br_b/(br_b+br_c)+hr)
+
+batting_against_historic <-
+  batting_against_raw %>% 
+  rename(team_name = tm) %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(year, league, tm, ra_g:roe) %>% 
+  mutate(across(!c(tm, league), as.numeric)) %>% 
+  mutate(iso = slg - ba,
+         hits_per_run = h / r,
+         br_a = h + bb + hbp -(.5*ibb) - hr,
+         br_b = 1.1 * ((1.4*slg*ab) - (.6*h) - (3*hr) - (.1*(bb+hbp-ibb)) + (.9*(sb-cs-gdp))),
+         br_c = pa - bb - sf - sh - hbp - h + cs + gdp,
+         br_raw = br_a*br_b/(br_b+br_c)+hr)
+
+br_adjustments <-
+  batting_historic %>% 
+  group_by(year, league) %>% 
+  summarize(r = sum(r),
+            br_raw = sum(br_raw)) %>% 
+  mutate(adj = r / br_raw) %>% 
+  select(-r, -br_raw)
+
+batting_historic <- 
+  batting_historic %>% 
+  left_join(br_adjustments) %>% 
+  mutate(base_runs = br_raw * adj * (162/g))
+
+batting_against_historic <-
+  batting_against_historic %>% 
+  left_join(br_adjustments) %>% 
+  mutate(base_runs = br_raw * adj * (162/g))
+  
+batting_results_last_year <-
+  batting_historic %>% 
+  filter(year == last_year) %>% 
+  select(-year)
+
+pitching_results_last_year <-
+  batting_against_historic %>% 
+  filter(year == last_year) %>% 
+  select(-year)
+
+```
+
 Step 1 - Get Data
 
 ```{r Step 1}
 team_stats_last_year <-
   standings_last_year %>% 
   full_join(batting_results_last_year, by = c("tm")) %>% 
-  select(-war) %>% 
-  full_join(pitching_results_last_year, by = c("tm")) %>% 
-  select(-war)
-
-team_stats_last_year <- 
-  team_stats_last_year %>% 
+  full_join(pitching_results_last_year, by = c("tm")) %>% View()
   rename(r_last_year = r,
          ra_last_year = ra) %>% 
   mutate(r_this_year = (r_last_year * games_this_year / g) %>% round(2),
          ra_this_year = (ra_last_year * games_this_year / g) %>% round(2))
-
+  
 step1 <-
   team_stats_last_year %>% 
   select(tm, r_this_year, ra_this_year) %>% 
