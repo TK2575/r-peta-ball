@@ -105,11 +105,13 @@ fangraphs_projections <-
 ```
 
 
-```{r prep inputs}
+```{r prep inputs, calculate base runs}
 
 standings_last_year <- 
   standings_last_year_raw %>% 
-  mutate(tm = tm %>% stringr::str_sub(start=-3)) %>% 
+  filter(tm != 'Average') %>% 
+  rename(team_name = tm) %>% 
+  left_join(team_abbreviation_map) %>% 
   select(year, tm, w:w_l_percent, r, ra) %>% 
   mutate(g = w+l,
          r = as.numeric(r),
@@ -152,15 +154,17 @@ br_adjustments <-
   mutate(adj = r / br_raw) %>% 
   select(-r, -br_raw)
 
-batting_historic <- 
+batting_historic <-
   batting_historic %>% 
   left_join(br_adjustments) %>% 
-  mutate(base_runs = br_raw * adj * (162/g))
+  mutate(base_runs = br_raw * adj * (162/g)) %>% 
+  select(-c(br_a:adj))
 
 batting_against_historic <-
   batting_against_historic %>% 
   left_join(br_adjustments) %>% 
-  mutate(base_runs = br_raw * adj * (162/g))
+  mutate(base_runs = br_raw * adj * (162/g)) %>% 
+  select(-c(br_a:adj))
   
 batting_results_last_year <-
   batting_historic %>% 
@@ -177,12 +181,19 @@ pitching_results_last_year <-
 Step 1 - Get Data
 
 ```{r Step 1}
+
 team_stats_last_year <-
   standings_last_year %>% 
-  full_join(batting_results_last_year, by = c("tm")) %>% 
-  full_join(pitching_results_last_year, by = c("tm")) %>% View()
+  select(-r_g, -g) %>% 
+  left_join(
+    (batting_results_last_year %>% 
+       select(-league)), by = c("tm")) %>% 
+left_join(
+  (pitching_results_last_year %>% 
+  rename_with(~paste0(., "_a"), ra_g:base_runs)),
+  by = c("tm")) %>%
   rename(r_last_year = r,
-         ra_last_year = ra) %>% 
+         ra_last_year = r_a) %>% 
   mutate(r_this_year = (r_last_year * games_this_year / g) %>% round(2),
          ra_this_year = (ra_last_year * games_this_year / g) %>% round(2))
   
@@ -203,7 +214,7 @@ Step 2: Calculate each team's cluster luck adjustments
 ```{r Step 2}
 
 hpr_model <- 
-  historic_batting %>% 
+  batting_historic %>% 
   lm(hits_per_run ~ obp + slg + iso, .)
 
 intercept_coefficient <- hpr_model$coefficients[[1]]
@@ -223,8 +234,8 @@ team_stats_last_year <-
            (slg_coefficient * slg_a) +
            (obp_coefficient * obp_a) +
            intercept_coefficient,
-         runs_exp = (h / hits_per_run + baseruns)/2,
-         runs_a_exp = (ha / hits_a_per_run + baseruns_a)/2)
+         runs_exp = (h / hits_per_run + base_runs)/2,
+         runs_a_exp = (h_a / hits_a_per_run + base_runs)/2)
 
 step2 <-
   team_stats_last_year %>% 
@@ -271,6 +282,7 @@ adjust_war <- function(last_year_results,
            ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2))
 }
 
+# TODO need war columns in *_results_last_year data sets
 step3a <-
   adjust_war(batting_results_last_year, batting_projections_this_year)
   
