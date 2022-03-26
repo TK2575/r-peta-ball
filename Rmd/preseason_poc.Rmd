@@ -55,6 +55,14 @@ batting_historic_raw <-
   filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
+fangraphs_batting_last_year <-
+  read_csv(here::here("in","last_year_batting_results.csv")) %>% 
+  janitor::clean_names()
+
+fangraphs_pitching_last_year <-
+  read_csv(here::here("in","last_year_pitching_results.csv")) %>% 
+  janitor::clean_names()
+
 batting_against_raw <- 
   last_ten_years %>% 
   map(team_batting_against) %>% 
@@ -101,6 +109,16 @@ fangraphs_projections <-
   select(tm, w:ra_g) %>% 
   rename(wp = w_percent) %>% 
   mutate(across(-tm, as.numeric))
+
+win_total_odds_raw <-
+  "https://www.thelines.com/odds/mlb/win-totals/" %>% 
+  read_html() %>%
+  html_nodes("table") %>% 
+  html_table(fill = TRUE) %>% 
+  .[[2]] %>% 
+  as_tibble() %>% 
+  select(1:2) 
+colnames(win_total_odds_raw) <- c("team_name", "o_u_wins_this_year")
 
 ```
 
@@ -169,12 +187,30 @@ batting_against_historic <-
 batting_results_last_year <-
   batting_historic %>% 
   filter(year == last_year) %>% 
-  select(-year)
+  select(-year) %>% 
+  left_join(
+    fangraphs_batting_last_year %>% 
+      rename(tm = team) %>% 
+      select(tm, war)
+    )
 
 pitching_results_last_year <-
   batting_against_historic %>% 
   filter(year == last_year) %>% 
-  select(-year)
+  select(-year) %>% 
+  left_join(
+    fangraphs_pitching_last_year %>%
+      rename(tm = team) %>% 
+      select(tm, war)
+    )
+
+win_total_odds <- 
+  win_total_odds_raw %>% 
+  tidyr::separate_rows(o_u_wins_this_year, sep = " ") %>% 
+  filter(o_u_wins_this_year != "Wins") %>% 
+  mutate(o_u_wins_this_year = as.numeric(o_u_wins_this_year)) %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(tm, o_u_wins_this_year)
 
 ```
 
@@ -282,7 +318,6 @@ adjust_war <- function(last_year_results,
            ra = (ra_exponent^(1/ex) - ra_running_adj) %>% round(2))
 }
 
-# TODO need war columns in *_results_last_year data sets
 step3a <-
   adjust_war(batting_results_last_year, batting_projections_this_year)
   
@@ -398,19 +433,13 @@ ggplotly(wins_proj_plot)
 
 ```
 
-```{r}
-
-odds_table <-
-  here::here("out",
-             "regular_season_win_total_odds_this_year.csv") %>% 
-  read_csv() %>% 
-  rename(w_odds = win_total)
+```{r Compare to Vegas}
 
 odds_comparison <-
   projection_comparison %>% 
-  left_join(odds_table) %>% 
-  select(tm, w_us, w_odds) %>% 
-  mutate(diff = w_us - w_odds)
+  left_join(win_total_odds) %>% 
+  select(tm, w_us, o_u_wins_this_year) %>% 
+  mutate(diff = w_us - o_u_wins_this_year)
 
 odds_comparison %>% 
   ggplot(aes(diff)) +

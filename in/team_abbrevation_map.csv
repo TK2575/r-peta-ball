@@ -1,5 +1,6 @@
 tm,team,team_name,league
 LAA,Angels,Los Angeles Angels,AL
+LAA,Angels,LA Angels,AL
 LAA,Angels,Los Angeles Angels of Anaheim,AL
 HOU,Astros,Houston Astros,AL
 OAK,Athletics,Oakland Athletics,AL
@@ -10,6 +11,7 @@ STL,Cardinals,St. Louis Cardinals,NL
 CHC,Cubs,Chicago Cubs,NL
 ARI,Diamondbacks,Arizona Diamondbacks,NL
 LAD,Dodgers,Los Angeles Dodgers,NL
+LAD,Dodgers, LA Dodgers,NL
 SFG,Giants,San Francisco Giants,NL
 CLE,Indians,Cleveland Indians,AL
 CLE,Cleveland,Cleveland Guardians,AL
