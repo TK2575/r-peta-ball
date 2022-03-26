@@ -17,46 +17,88 @@ library(here)
 source(here::here("R", "scrape_bref.R"))
 ```
 
-```{r Get Historic Data}
+```{r import}
 
-years <- c(2010:2019)
+years <- c(2012:2021)
 
 batting_raw <-
   years %>% 
   map(team_batting) %>% 
   bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
 pitching_raw <-
   years %>% 
   map(team_batting_against) %>% 
   bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot')) %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
+  janitor::clean_names()
+
+team_abbreviation_map <-
+  here::here("in", "team_abbrevation_map.csv") %>% 
+  readr::read_csv() %>% 
   janitor::clean_names()
   
 ```
 
 
-```{r Clean Data}
+```{r clean_and_mutate}
 
 batting <-
-  batting_raw %>% 
-  rename(ops_plus = ops_2) %>%
-  mutate(across(-tm, as.numeric)) %>% 
+  batting_raw %>%
+  rename(team_name = tm) %>% 
+  left_join(team_abbreviation_map) %>% 
+  rename(ops_plus = ops_2) %>% 
+  select(year, league, tm, number_bat:lob) %>% 
+  mutate(across(!c(tm, league), as.numeric)) %>% 
   mutate(iso = slg - ba,
-         hits_per_run = h / r)
+         hits_per_run = h / r,
+         br_a = h + bb + hbp -(.5*ibb) - hr,
+         br_b = 1.1 * ((1.4*slg*ab) - (.6*h) - (3*hr) - (.1*(bb+hbp-ibb)) + (.9*(sb-cs-gdp))),
+         br_c = pa - bb - sf - sh - hbp - h + cs + gdp,
+         br_raw = br_a*br_b/(br_b+br_c)+hr)
+
+pitching <-
+  pitching_raw %>% 
+  rename(team_name = tm) %>% 
+  filter(team_name != 'League Average') %>% 
+  left_join(team_abbreviation_map) %>% 
+  select(year, league, tm, ra_g:roe) %>% 
+  mutate(across(!c(tm, league), as.numeric)) %>% 
+  mutate(iso = slg - ba,
+         hits_per_run = h / r,
+         br_a = h + bb + hbp -(.5*ibb) - hr,
+         br_b = 1.1 * ((1.4*slg*ab) - (.6*h) - (3*hr) - (.1*(bb+hbp-ibb)) + (.9*(sb-cs-gdp))),
+         br_c = pa - bb - sf - sh - hbp - h + cs + gdp,
+         br_raw = br_a*br_b/(br_b+br_c)+hr)
+
+```
+
+```{r league_adjustments}
+
+br_adjustments <-
+  batting %>% 
+  group_by(year, league) %>% 
+  summarize(r = sum(r),
+            br_raw = sum(br_raw)) %>% 
+  mutate(adj = r / br_raw) %>% 
+  select(-r, -br_raw)
+
+batting <-
+  batting %>% 
+  left_join(br_adjustments) %>% 
+  mutate(base_runs = br_raw * adj * (162/g))
 
 pitching <- 
-  pitching_raw %>% 
-  mutate(across(-tm, as.numeric)) %>% 
-  mutate(iso = slg - ba,
-         hits_per_run = h /r)
+  pitching %>% 
+  left_join(br_adjustments) %>% 
+  mutate(base_runs = br_raw * adj * (162/g))
 
 ```
 
 
-```{r Regression Model}
+```{r model}
 
 batting_model <- lm(hits_per_run ~ obp + slg + iso, batting)
 pitching_model <- lm(hits_per_run ~ obp + slg + iso, pitching)
