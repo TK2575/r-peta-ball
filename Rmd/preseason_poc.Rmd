@@ -55,10 +55,12 @@ batting_historic_raw <-
   filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
+# https://www.fangraphs.com/leaders.aspx?pos=all&stats=bat&lg=all&qual=0&type=8&season=2021&month=0&season1=2021&ind=0&team=0,ts&rost=&age=&filter=&players=0
 fangraphs_batting_last_year <-
   read_csv(here::here("in","last_year_batting_results.csv")) %>% 
   janitor::clean_names()
 
+# https://www.fangraphs.com/leaders.aspx?pos=all&stats=pit&lg=all&qual=0&type=8&season=2021&month=0&season1=2021&ind=0&team=0,ts&rost=0&age=0&filter=&players=0&startdate=&enddate=
 fangraphs_pitching_last_year <-
   read_csv(here::here("in","last_year_pitching_results.csv")) %>% 
   janitor::clean_names()
@@ -439,6 +441,7 @@ odds_comparison <-
   projection_comparison %>% 
   left_join(win_total_odds) %>% 
   select(tm, w_us, o_u_wins_this_year) %>% 
+  distinct() %>% 
   mutate(diff = w_us - o_u_wins_this_year)
 
 odds_comparison %>% 
