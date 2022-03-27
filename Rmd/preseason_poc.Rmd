@@ -433,6 +433,8 @@ wins_proj_plot <-
 
 ggplotly(wins_proj_plot)
 
+# TODO residual plot to evaluate our model error
+
 ```
 
 ```{r Compare to Vegas}
@@ -448,6 +450,9 @@ odds_comparison %>%
   ggplot(aes(diff)) +
   geom_histogram(binwidth = 4)
 
+# TODO similar linear and residula plots as above comparing vegas odds and our projections
+
+# TODO consider absolute value?
 odds_comparison %>% 
   filter(abs(diff) > 4) %>% 
   arrange(abs(diff) %>% desc) %>% 
