@@ -1,52 +1,51 @@
 ---
-title: "Historic Batting & Pitching Analysis"
+title: "Model Comparison"
 author: "Tom & Will"
-date: "3/25/2021"
+date: "3/28/2022"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
 library(baseballr)
 library(janitor)
 library(here)
-
+library(tidyverse)
+library(gtsummary)
+library(here)
 source(here::here("R", "scrape_bref.R"))
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r import}
+```{r data, include=FALSE}
 
-years <- c(2012:2021)
-
-batting_raw <-
-  years %>% 
-  map(team_batting) %>% 
-  bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
-  janitor::clean_names()
-
-pitching_raw <-
-  years %>% 
-  map(team_batting_against) %>% 
-  bind_rows() %>% 
-  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
-  janitor::clean_names()
+last_year <- 2021
+this_year <- 2022
+games_this_year <- 162
+last_ten_years <- c((last_year-9):last_year)
 
 team_abbreviation_map <-
   here::here("in", "team_abbrevation_map.csv") %>% 
   readr::read_csv() %>% 
   janitor::clean_names()
-  
-```
 
+batting_historic_raw <-
+  last_ten_years %>% 
+  map(team_batting) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
+  janitor::clean_names()
 
-```{r clean_and_mutate}
+batting_against_raw <- 
+  last_ten_years %>% 
+  map(team_batting_against) %>% 
+  bind_rows() %>% 
+  filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
+  janitor::clean_names()
 
-batting <-
-  batting_raw %>%
+batting_historic <-
+  batting_historic_raw %>% 
   rename(team_name = tm) %>% 
   left_join(team_abbreviation_map) %>% 
   rename(ops_plus = ops_2) %>% 
@@ -59,10 +58,9 @@ batting <-
          br_c = pa - bb - sf - sh - hbp - h + cs + gdp,
          br_raw = br_a*br_b/(br_b+br_c)+hr)
 
-pitching <-
-  pitching_raw %>% 
+batting_against_historic <-
+  batting_against_raw %>% 
   rename(team_name = tm) %>% 
-  filter(team_name != 'League Average') %>% 
   left_join(team_abbreviation_map) %>% 
   select(year, league, tm, ra_g:roe) %>% 
   mutate(across(!c(tm, league), as.numeric)) %>% 
@@ -73,42 +71,46 @@ pitching <-
          br_c = pa - bb - sf - sh - hbp - h + cs + gdp,
          br_raw = br_a*br_b/(br_b+br_c)+hr)
 
-```
-
-```{r league_adjustments}
-
 br_adjustments <-
-  batting %>% 
+  batting_historic %>% 
   group_by(year, league) %>% 
   summarize(r = sum(r),
             br_raw = sum(br_raw)) %>% 
   mutate(adj = r / br_raw) %>% 
   select(-r, -br_raw)
 
-batting <-
-  batting %>% 
+batting_historic <-
+  batting_historic %>% 
   left_join(br_adjustments) %>% 
-  mutate(base_runs = br_raw * adj * (162/g))
+  mutate(base_runs = br_raw * adj * (162/g)) %>% 
+  select(-c(br_a:adj))
 
-pitching <- 
-  pitching %>% 
+batting_against_historic <-
+  batting_against_historic %>% 
   left_join(br_adjustments) %>% 
-  mutate(base_runs = br_raw * adj * (162/g))
+  mutate(base_runs = br_raw * adj * (162/g)) %>% 
+  select(-c(br_a:adj))
 
 ```
 
 
-```{r model}
+### Hits Per Run Model
 
-batting_model <- lm(hits_per_run ~ obp + slg + iso, batting)
-pitching_model <- lm(hits_per_run ~ obp + slg + iso, pitching)
+```{r Hits Per Run, echo=FALSE}
 
-summary(batting_model)
-summary(pitching_model)
+batting_historic %>% 
+  lm(hits_per_run ~ obp + slg + iso, .) %>% 
+  tbl_regression() %>% 
+  add_glance_table(include = c(nobs, r.squared, AIC)) 
 
 ```
 
-### Resources
-1. [Excel - Perform a regression analysis](https://support.microsoft.com/en-us/office/perform-a-regression-analysis-54f5c00e-0f51-4274-a4a7-ae46b418a23e)
-2. [Classical Multivariate Regression](https://cran.r-project.org/web/packages/rrr/vignettes/rrr.html)
-3. [EDUCBA - Multiple Linear Regression in R](https://www.educba.com/multiple-linear-regression-in-r/)
+### Hits Per Run Against Model
+```{r Hits Per Run Against, echo=FALSE}
+
+batting_against_historic %>% 
+  lm(hits_per_run ~ obp + slg + iso, .) %>% 
+  tbl_regression() %>% 
+  add_glance_table(include = c(nobs, r.squared, AIC)) 
+```
+  
