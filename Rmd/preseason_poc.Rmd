@@ -483,9 +483,27 @@ odds_comparison_model %>%
   geom_point() +
   geom_abline(slope=0)
 
+# TODO add edge, % of bankroll risked
 odds_comparison %>% 
   filter(abs(diff) > 4) %>% 
   arrange(abs(diff) %>% desc) %>% 
   write_csv(here::here("out", "potential_bets.csv"))
   
+```
+
+```{r projected standings}
+
+projected_standings <-
+  team_projections_this_year %>% 
+  left_join(team_abbreviation_map) %>% 
+  mutate(w = (games_this_year * wp) %>% round,
+         l = games_this_year - w,
+         g = w + l,
+         wp = round(wp, 3)) %>% 
+  select(league, division, tm, g, w, l, wp) %>% 
+  arrange(league, division, wp %>% desc)
+
+projected_standings %>% 
+  write_csv(here::here("out", "projected_standings.csv"))
+
 ```
