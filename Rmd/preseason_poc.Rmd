@@ -117,7 +117,7 @@ win_total_odds_raw <-
   read_html() %>%
   html_nodes("table") %>% 
   html_table(fill = TRUE) %>% 
-  .[[2]] %>% 
+  .[[1]] %>% 
   as_tibble() %>% 
   select(1:2) 
 colnames(win_total_odds_raw) <- c("team_name", "o_u_wins_this_year")
@@ -260,6 +260,15 @@ obp_coefficient <- hpr_model$coefficients[[2]]
 slg_coefficient <- hpr_model$coefficients[[3]]
 iso_coefficient <- hpr_model$coefficients[[4]]
 
+hpra_model <-
+  batting_against_historic %>% 
+  lm(hits_per_run ~ obp + slg + iso, .)
+
+intercept_a_coefficient <- hpra_model$coefficients[[1]]
+obp_a_coefficient <- hpra_model$coefficients[[2]]
+slg_a_coefficient <- hpra_model$coefficients[[3]]
+iso_a_coefficient <- hpra_model$coefficients[[4]]
+
 team_stats_last_year <-
   team_stats_last_year %>% 
   mutate(hits_per_run = 
@@ -268,12 +277,12 @@ team_stats_last_year <-
            (obp_coefficient * obp) +
            intercept_coefficient,
          hits_a_per_run = 
-           (iso_coefficient * iso_a) +
-           (slg_coefficient * slg_a) +
-           (obp_coefficient * obp_a) +
-           intercept_coefficient,
+           (iso_a_coefficient * iso_a) +
+           (slg_a_coefficient * slg_a) +
+           (obp_a_coefficient * obp_a) +
+           intercept_a_coefficient,
          runs_exp = (h / hits_per_run + base_runs)/2,
-         runs_a_exp = (h_a / hits_a_per_run + base_runs)/2)
+         runs_a_exp = (h_a / hits_a_per_run + base_runs_a)/2)
 
 step2 <-
   team_stats_last_year %>% 
@@ -433,7 +442,13 @@ wins_proj_plot <-
 
 ggplotly(wins_proj_plot)
 
-# TODO residual plot to evaluate our model error
+wins_proj_model <-
+  projection_comparison %>% 
+  lm(w_fangraphs~w_us, .)
+
+ggplot(wins_proj_model, aes(x=.fitted, y=.resid)) +
+  geom_point() +
+  geom_abline(slope=0)
 
 ```
 
@@ -450,9 +465,24 @@ odds_comparison %>%
   ggplot(aes(diff)) +
   geom_histogram(binwidth = 4)
 
-# TODO similar linear and residula plots as above comparing vegas odds and our projections
+win_odds_plot <-
+  odds_comparison %>% 
+    select(tm, o_u_wins_this_year, w_us) %>% 
+    ggplot(aes(o_u_wins_this_year, w_us, color=tm)) +
+    geom_point() +
+    geom_abline(slope=1)
 
-# TODO consider absolute value?
+ggplotly(win_odds_plot)
+
+odds_comparison_model <-
+  odds_comparison %>% 
+  lm(o_u_wins_this_year~w_us, .)
+
+odds_comparison_model %>% 
+  ggplot(aes(x=.fitted, y=.resid)) +
+  geom_point() +
+  geom_abline(slope=0)
+
 odds_comparison %>% 
   filter(abs(diff) > 4) %>% 
   arrange(abs(diff) %>% desc) %>% 
