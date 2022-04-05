@@ -17,6 +17,7 @@ library(baseballr)
 library(janitor)
 library(here)
 source(here::here("R", "scrape_bref.R"))
+source(here::here("R", "collapse_projections.R"))
 ```
 
 ```{r constants_and_functions}
@@ -72,27 +73,13 @@ batting_against_raw <-
   filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
-# https://www.fangraphs.com/projections.aspx?pos=all&stats=bat&type=fangraphsdc
-batting_projections_this_year <-
-  here::here("in", "this_year_batting_projections.csv") %>%
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  dplyr::filter(!is.na(team)) %>% 
-  group_by(team) %>% 
-  summarize(war_proj = sum(war)) %>% 
-  rename(tm=team) %>% 
-  select(tm, war_proj)
+player_projections_batting <-
+  here::here("in/this_year_projections/batting") %>% 
+  collapse_projections()
 
-# https://www.fangraphs.com/projections.aspx?pos=all&stats=pit&type=fangraphsdc&team=0&lg=all&players=0
-pitching_projections_this_year <-
-  here::here("in", "this_year_pitching_projections.csv") %>%
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  dplyr::filter(!is.na(team)) %>% 
-  group_by(team) %>% 
-  summarize(war_proj = sum(war)) %>% 
-  rename(tm=team) %>% 
-  select(tm, war_proj)
+player_projections_pitching <-
+  here::here("in/this_year_projections/pitching") %>% 
+  collapse_projections()
 
 fangraphs_projections_url <- 
   "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
@@ -205,6 +192,18 @@ pitching_results_last_year <-
       rename(tm = team) %>% 
       select(tm, war)
     )
+
+batting_projections_this_year <-
+  player_projections_batting %>% 
+  rename(tm = team) %>% 
+  group_by(tm) %>% 
+  summarize(war = sum(war))
+
+pitching_projections_this_year <-
+  player_projections_pitching %>% 
+  rename(tm = team) %>% 
+  group_by(tm) %>% 
+  summarize(war = sum(war))
 
 win_total_odds <- 
   win_total_odds_raw %>% 
