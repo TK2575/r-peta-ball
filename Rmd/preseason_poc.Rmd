@@ -359,7 +359,7 @@ team_projections_this_year %>%
 
 ```
 
-Step 5: Normalize all RS/RA to last year's environment of total runs
+Step 5: Normalize all RS/RA to last year's environment of total runs, Calculate expected wins via Pythagorean theorem 
 
 ```{r Step 5}
 # add the correct number of runs/allowed to each team so that the total projected for this year equals the last year's 162 game page
@@ -371,7 +371,7 @@ runs_projected_this_year <-
   mutate(year = this_year)
 
 runs_pace_last_year <-
-  #how many runs would be scored by all teams in 162 games
+  # how many runs would be scored by all teams in 162 games
   team_stats_last_year %>% 
   select(tm, g, r_last_year:ra_this_year) %>% 
   mutate(r_last_year_162 = r_last_year * games_this_year / g,
@@ -387,34 +387,25 @@ team_count <-
   pull()
   
 runs_projected_adjustments <-
-  tibble(r = (runs_pace_last_year$r - runs_projected_this_year$r) / team_count, 
-         #total runs (per team) scored last year minus this year
-         ra = (runs_pace_last_year$ra - runs_projected_this_year$ra) / team_count)
+  tibble(r_normalize = (runs_pace_last_year$r / runs_projected_this_year$r), 
+         # total runs (per team) scored last year minus this year
+         ra_normalize = (runs_pace_last_year$ra / runs_projected_this_year$ra))
 
 team_projections_this_year <-
   team_projections_this_year %>% 
   rename(r_raw = r,
          ra_raw = ra) %>% 
-  mutate(r = r_raw + runs_projected_adjustments$r, 
-         #add (or subtracts) runs to make the "run environments" the same between last year and this year
-         ra = ra_raw + runs_projected_adjustments$ra)
-```
-
-Step 6: Calculate expected wins via Pythagorean theorem
-
-```{r Step 6}
+  mutate(r = r_raw * runs_projected_adjustments$r_normalize, 
+         # add (or subtracts) runs to make the "run environments" the same between last year and this year
+         ra = ra_raw * runs_projected_adjustments$ra_normalize)
 
 team_projections_this_year <- 
   team_projections_this_year %>% 
-  mutate(r_last_year_adj = step3a$r_this_year + runs_projected_adjustments$r,
-         ra_last_year_adj = step3b$ra_this_year + runs_projected_adjustments$ra,
-         r_adjustment = r - r_last_year_adj,
-         ra_adjustment = ra - ra_last_year_adj,
-         r_diff = r - ra,
+  mutate(r_diff = r - ra,
          r_g = r / games_this_year,
          ra_g = ra / games_this_year,
          wp = r^ex / (r^ex + ra^ex)) %>% 
-  select(tm, wp, r, ra, r_last_year_adj, ra_last_year_adj, r_adjustment, ra_adjustment, r_diff, r_g, ra_g)
+  select(tm, wp, r, ra, r_diff, r_g, ra_g)
 
 team_projections_this_year %>% 
   arrange(wp %>% desc()) %>% 
