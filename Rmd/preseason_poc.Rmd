@@ -495,7 +495,19 @@ odds_comparison <-
   left_join(win_total_odds) %>% 
   select(tm, w_us, o_u_wins_this_year) %>% 
   distinct() %>% 
-  mutate(diff = w_us - o_u_wins_this_year)
+  mutate(diff = w_us - o_u_wins_this_year,
+         abs_diff = abs(diff),
+         edge = (abs_diff / o_u_wins_this_year) %>% round(3),
+         fund_risk = case_when(
+           abs_diff <= 4 ~ 0,
+           edge < .03 ~ .001,
+           edge < .06 ~ .002,
+           edge < .09 ~ .004,
+           edge < .11 ~ .005,
+           edge < .13 ~ .010,
+           edge < .15 ~ .015,
+           TRUE ~ .020
+         ))
 
 odds_comparison %>% 
   ggplot(aes(diff)) +
@@ -519,9 +531,9 @@ odds_comparison_model %>%
   geom_point() +
   geom_abline(slope=0)
 
-# TODO add edge, % of bankroll risked
 odds_comparison %>% 
-  filter(abs(diff) > 4) %>% 
+  filter(abs_diff > 4) %>% 
+  select(-abs_diff) %>% 
   arrange(abs(diff) %>% desc) %>% 
   write_csv(here::here("out", "potential_bets.csv"))
   
