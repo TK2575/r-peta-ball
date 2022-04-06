@@ -244,6 +244,11 @@ step1 %>%
   write_csv(here::here("out", "step1.csv"))
 
 team_projections_this_year <- step1
+
+summary <- 
+  step1 %>% 
+  pivot_longer(cols = -tm) %>% 
+  rename(step1 = value)
 ```
 
 Step 2: Calculate each team's cluster luck adjustments
@@ -298,6 +303,19 @@ step2 %>%
 team_projections_this_year <- 
   apply_adjustments(team_projections_this_year, step2)
 
+summary <-
+  summary %>% 
+    left_join(
+      step2 %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step2_adj = value)
+    , by = c("tm", "name")) %>% 
+    left_join(
+      team_projections_this_year %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step2 = value)
+    , by = c("tm", "name"))
+
 ```
 
 Step 3: Calculate team offense and pitching WAR adjustments
@@ -347,6 +365,19 @@ step3 %>% write_csv(here::here("out", "step3.csv"))
 
 team_projections_this_year <- 
   apply_adjustments(team_projections_this_year, step3)
+
+summary <-
+  summary %>% 
+    left_join(
+      step3 %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step3_adj = value)
+    , by = c("tm", "name")) %>% 
+    left_join(
+      team_projections_this_year %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step4 = value)
+    , by = c("tm", "name"))
 
 ```
 
@@ -411,6 +442,21 @@ team_projections_this_year %>%
   arrange(wp %>% desc()) %>% 
   mutate_if(is.numeric, ~round(., 3)) %>% 
   write_csv(here::here("out", "step5.csv"))
+
+summary <-
+  summary %>% 
+    mutate(step5_adj = if_else(
+      name == "r", 
+      runs_projected_adjustments$r_normalize,
+      runs_projected_adjustments$ra_normalize)) %>% 
+    left_join(
+      team_projections_this_year %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step5 = value)
+    , by = c("tm", "name"))
+
+summary %>% 
+  write_csv(here::here("out", "model_summary"))
 ```
 
 ```{r Compare to Fangraphs}
