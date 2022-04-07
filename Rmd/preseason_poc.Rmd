@@ -17,6 +17,7 @@ library(baseballr)
 library(janitor)
 library(here)
 source(here::here("R", "scrape_bref.R"))
+source(here::here("R", "collapse_projections.R"))
 ```
 
 ```{r constants_and_functions}
@@ -55,10 +56,12 @@ batting_historic_raw <-
   filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
+# https://www.fangraphs.com/leaders.aspx?pos=all&stats=bat&lg=all&qual=0&type=8&season=2021&month=0&season1=2021&ind=0&team=0,ts&rost=&age=&filter=&players=0
 fangraphs_batting_last_year <-
   read_csv(here::here("in","last_year_batting_results.csv")) %>% 
   janitor::clean_names()
 
+# https://www.fangraphs.com/leaders.aspx?pos=all&stats=pit&lg=all&qual=0&type=8&season=2021&month=0&season1=2021&ind=0&team=0,ts&rost=0&age=0&filter=&players=0&startdate=&enddate=
 fangraphs_pitching_last_year <-
   read_csv(here::here("in","last_year_pitching_results.csv")) %>% 
   janitor::clean_names()
@@ -70,27 +73,13 @@ batting_against_raw <-
   filter(!tm %in% c('LgAvg','LgTot','League Average')) %>% 
   janitor::clean_names()
 
-# https://www.fangraphs.com/projections.aspx?pos=all&stats=bat&type=fangraphsdc
-batting_projections_this_year <-
-  here::here("in", "this_year_batting_projections.csv") %>%
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  dplyr::filter(!is.na(team)) %>% 
-  group_by(team) %>% 
-  summarize(war_proj = sum(war)) %>% 
-  rename(tm=team) %>% 
-  select(tm, war_proj)
+player_projections_batting <-
+  here::here("in/this_year_projections/batting") %>% 
+  collapse_projections()
 
-# https://www.fangraphs.com/projections.aspx?pos=all&stats=pit&type=fangraphsdc&team=0&lg=all&players=0
-pitching_projections_this_year <-
-  here::here("in", "this_year_pitching_projections.csv") %>%
-  readr::read_csv() %>% 
-  janitor::clean_names() %>% 
-  dplyr::filter(!is.na(team)) %>% 
-  group_by(team) %>% 
-  summarize(war_proj = sum(war)) %>% 
-  rename(tm=team) %>% 
-  select(tm, war_proj)
+player_projections_pitching <-
+  here::here("in/this_year_projections/pitching") %>% 
+  collapse_projections()
 
 fangraphs_projections_url <- 
   "https://www.fangraphs.com/depthcharts.aspx?position=Standings"
@@ -115,7 +104,7 @@ win_total_odds_raw <-
   read_html() %>%
   html_nodes("table") %>% 
   html_table(fill = TRUE) %>% 
-  .[[2]] %>% 
+  .[[1]] %>% 
   as_tibble() %>% 
   select(1:2) 
 colnames(win_total_odds_raw) <- c("team_name", "o_u_wins_this_year")
@@ -204,6 +193,18 @@ pitching_results_last_year <-
       select(tm, war)
     )
 
+batting_projections_this_year <-
+  player_projections_batting %>% 
+  rename(tm = team) %>% 
+  group_by(tm) %>% 
+  summarize(war = sum(war))
+
+pitching_projections_this_year <-
+  player_projections_pitching %>% 
+  rename(tm = team) %>% 
+  group_by(tm) %>% 
+  summarize(war = sum(war))
+
 win_total_odds <- 
   win_total_odds_raw %>% 
   tidyr::separate_rows(o_u_wins_this_year, sep = " ") %>% 
@@ -243,6 +244,11 @@ step1 %>%
   write_csv(here::here("out", "step1.csv"))
 
 team_projections_this_year <- step1
+
+summary <- 
+  step1 %>% 
+  pivot_longer(cols = -tm) %>% 
+  rename(step1 = value)
 ```
 
 Step 2: Calculate each team's cluster luck adjustments
@@ -258,6 +264,15 @@ obp_coefficient <- hpr_model$coefficients[[2]]
 slg_coefficient <- hpr_model$coefficients[[3]]
 iso_coefficient <- hpr_model$coefficients[[4]]
 
+hpra_model <-
+  batting_against_historic %>% 
+  lm(hits_per_run ~ obp + slg + iso, .)
+
+intercept_a_coefficient <- hpra_model$coefficients[[1]]
+obp_a_coefficient <- hpra_model$coefficients[[2]]
+slg_a_coefficient <- hpra_model$coefficients[[3]]
+iso_a_coefficient <- hpra_model$coefficients[[4]]
+
 team_stats_last_year <-
   team_stats_last_year %>% 
   mutate(hits_per_run = 
@@ -266,12 +281,12 @@ team_stats_last_year <-
            (obp_coefficient * obp) +
            intercept_coefficient,
          hits_a_per_run = 
-           (iso_coefficient * iso_a) +
-           (slg_coefficient * slg_a) +
-           (obp_coefficient * obp_a) +
-           intercept_coefficient,
+           (iso_a_coefficient * iso_a) +
+           (slg_a_coefficient * slg_a) +
+           (obp_a_coefficient * obp_a) +
+           intercept_a_coefficient,
          runs_exp = (h / hits_per_run + base_runs)/2,
-         runs_a_exp = (h_a / hits_a_per_run + base_runs)/2)
+         runs_a_exp = (h_a / hits_a_per_run + base_runs_a)/2)
 
 step2 <-
   team_stats_last_year %>% 
@@ -287,6 +302,19 @@ step2 %>%
 
 team_projections_this_year <- 
   apply_adjustments(team_projections_this_year, step2)
+
+summary <-
+  summary %>% 
+    left_join(
+      step2 %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step2_adj = value)
+    , by = c("tm", "name")) %>% 
+    left_join(
+      team_projections_this_year %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step2 = value)
+    , by = c("tm", "name"))
 
 ```
 
@@ -338,6 +366,19 @@ step3 %>% write_csv(here::here("out", "step3.csv"))
 team_projections_this_year <- 
   apply_adjustments(team_projections_this_year, step3)
 
+summary <-
+  summary %>% 
+    left_join(
+      step3 %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step3_adj = value)
+    , by = c("tm", "name")) %>% 
+    left_join(
+      team_projections_this_year %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step4 = value)
+    , by = c("tm", "name"))
+
 ```
 
 Step 4: Sum up adjustments
@@ -349,7 +390,7 @@ team_projections_this_year %>%
 
 ```
 
-Step 5: Normalize all RS/RA to last year's environment of total runs
+Step 5: Normalize all RS/RA to last year's environment of total runs, Calculate expected wins via Pythagorean theorem 
 
 ```{r Step 5}
 # add the correct number of runs/allowed to each team so that the total projected for this year equals the last year's 162 game page
@@ -361,7 +402,7 @@ runs_projected_this_year <-
   mutate(year = this_year)
 
 runs_pace_last_year <-
-  #how many runs would be scored by all teams in 162 games
+  # how many runs would be scored by all teams in 162 games
   team_stats_last_year %>% 
   select(tm, g, r_last_year:ra_this_year) %>% 
   mutate(r_last_year_162 = r_last_year * games_this_year / g,
@@ -377,39 +418,46 @@ team_count <-
   pull()
   
 runs_projected_adjustments <-
-  tibble(r = (runs_pace_last_year$r - runs_projected_this_year$r) / team_count, 
-         #total runs (per team) scored last year minus this year
-         ra = (runs_pace_last_year$ra - runs_projected_this_year$ra) / team_count)
+  tibble(r_normalize = (runs_pace_last_year$r / runs_projected_this_year$r), 
+         # total runs (per team) scored last year minus this year
+         ra_normalize = (runs_pace_last_year$ra / runs_projected_this_year$ra))
 
 team_projections_this_year <-
   team_projections_this_year %>% 
   rename(r_raw = r,
          ra_raw = ra) %>% 
-  mutate(r = r_raw + runs_projected_adjustments$r, 
-         #add (or subtracts) runs to make the "run environments" the same between last year and this year
-         ra = ra_raw + runs_projected_adjustments$ra)
-```
-
-Step 6: Calculate expected wins via Pythagorean theorem
-
-```{r Step 6}
+  mutate(r = r_raw * runs_projected_adjustments$r_normalize, 
+         # add (or subtracts) runs to make the "run environments" the same between last year and this year
+         ra = ra_raw * runs_projected_adjustments$ra_normalize)
 
 team_projections_this_year <- 
   team_projections_this_year %>% 
-  mutate(r_last_year_adj = step3a$r_this_year + runs_projected_adjustments$r,
-         ra_last_year_adj = step3b$ra_this_year + runs_projected_adjustments$ra,
-         r_adjustment = r - r_last_year_adj,
-         ra_adjustment = ra - ra_last_year_adj,
-         r_diff = r - ra,
+  mutate(r_diff = r - ra,
          r_g = r / games_this_year,
          ra_g = ra / games_this_year,
          wp = r^ex / (r^ex + ra^ex)) %>% 
-  select(tm, wp, r, ra, r_last_year_adj, ra_last_year_adj, r_adjustment, ra_adjustment, r_diff, r_g, ra_g)
+  select(tm, wp, r, ra, r_diff, r_g, ra_g)
 
 team_projections_this_year %>% 
   arrange(wp %>% desc()) %>% 
   mutate_if(is.numeric, ~round(., 3)) %>% 
   write_csv(here::here("out", "step5.csv"))
+
+summary <-
+  summary %>% 
+    mutate(step5_adj = if_else(
+      name == "r", 
+      runs_projected_adjustments$r_normalize,
+      runs_projected_adjustments$ra_normalize)) %>% 
+    left_join(
+      team_projections_this_year %>% 
+        pivot_longer(cols = -tm) %>% 
+        rename(step5 = value)
+    , by = c("tm", "name"))
+
+summary %>% 
+  mutate_if(is.numeric, ~round(., 3)) %>% 
+  write_csv(here::here("out", "model_summary.csv"))
 ```
 
 ```{r Compare to Fangraphs}
@@ -431,6 +479,14 @@ wins_proj_plot <-
 
 ggplotly(wins_proj_plot)
 
+wins_proj_model <-
+  projection_comparison %>% 
+  lm(w_fangraphs~w_us, .)
+
+ggplot(wins_proj_model, aes(x=.fitted, y=.resid)) +
+  geom_point() +
+  geom_abline(slope=0)
+
 ```
 
 ```{r Compare to Vegas}
@@ -439,15 +495,65 @@ odds_comparison <-
   projection_comparison %>% 
   left_join(win_total_odds) %>% 
   select(tm, w_us, o_u_wins_this_year) %>% 
-  mutate(diff = w_us - o_u_wins_this_year)
+  distinct() %>% 
+  mutate(diff = w_us - o_u_wins_this_year,
+         abs_diff = abs(diff),
+         edge = (abs_diff / o_u_wins_this_year) %>% round(3),
+         fund_risk = case_when(
+           abs_diff <= 4 ~ 0,
+           edge < .03 ~ .001,
+           edge < .06 ~ .002,
+           edge < .09 ~ .004,
+           edge < .11 ~ .005,
+           edge < .13 ~ .010,
+           edge < .15 ~ .015,
+           TRUE ~ .020
+         ))
 
 odds_comparison %>% 
   ggplot(aes(diff)) +
   geom_histogram(binwidth = 4)
 
+win_odds_plot <-
+  odds_comparison %>% 
+    select(tm, o_u_wins_this_year, w_us) %>% 
+    ggplot(aes(o_u_wins_this_year, w_us, color=tm)) +
+    geom_point() +
+    geom_abline(slope=1)
+
+ggplotly(win_odds_plot)
+
+odds_comparison_model <-
+  odds_comparison %>% 
+  lm(o_u_wins_this_year~w_us, .)
+
+odds_comparison_model %>% 
+  ggplot(aes(x=.fitted, y=.resid)) +
+  geom_point() +
+  geom_abline(slope=0)
+
 odds_comparison %>% 
-  filter(abs(diff) > 4) %>% 
-  arrange(abs(diff) %>% desc) %>% 
+  filter(abs_diff > 4) %>% 
+  select(-abs_diff) %>% 
+  arrange(edge %>% desc) %>% 
   write_csv(here::here("out", "potential_bets.csv"))
   
+```
+
+```{r projected standings}
+
+projected_standings <-
+  team_projections_this_year %>% 
+  left_join(team_abbreviation_map) %>% 
+  mutate(w = (games_this_year * wp) %>% round,
+         l = games_this_year - w,
+         g = w + l,
+         wp = round(wp, 3)) %>% 
+  select(league, division, tm, g, w, l, wp) %>% 
+  distinct() %>% 
+  arrange(league, division, wp %>% desc)
+
+projected_standings %>% 
+  write_csv(here::here("out", "projected_standings.csv"))
+
 ```
