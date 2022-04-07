@@ -535,7 +535,7 @@ odds_comparison_model %>%
 odds_comparison %>% 
   filter(abs_diff > 4) %>% 
   select(-abs_diff) %>% 
-  arrange(abs(diff) %>% desc) %>% 
+  arrange(edge %>% desc) %>% 
   write_csv(here::here("out", "potential_bets.csv"))
   
 ```
@@ -550,6 +550,7 @@ projected_standings <-
          g = w + l,
          wp = round(wp, 3)) %>% 
   select(league, division, tm, g, w, l, wp) %>% 
+  distinct() %>% 
   arrange(league, division, wp %>% desc)
 
 projected_standings %>% 
